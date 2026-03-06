@@ -8,6 +8,9 @@
   ![License](https://img.shields.io/badge/License-GPL--2.0-green?style=flat)
 </div>
 
+<img width="1660" height="1057" alt="Screenshot" src="https://github.com/user-attachments/assets/de7717cc-620b-425b-9171-f2e00a7f8762" />
+<img width="1660" height="1057" alt="Screenshot-1" src="https://github.com/user-attachments/assets/336f31c4-3e7a-469d-a29a-d0b3f5b80ff5" />
+
 ---
 
 PacHub is a native GTK4 graphical front end for `pacman` and AUR helpers. It follows the GNOME Human Interface Guidelines via libadwaita, giving you a clean and modern way to browse, search, install, and manage packages on Arch Linux — without ever opening a terminal.
@@ -131,5 +134,6 @@ PacHub is licensed under the **GNU General Public License v2.0**. See the [GPL-2
 
 - Homepage: [github.com/mrks1469/PacHub](https://github.com/mrks1469/PacHub)
 - Bug reports: [github.com/mrks1469/PacHub/issues](https://github.com/mrks1469/PacHub/issues)
+
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/mrks0001)
