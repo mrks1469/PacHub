@@ -82,7 +82,7 @@ chmod +x install.sh
 
 The installer will:
 1. Check for and install any missing dependencies via `pacman`
-2. Copy `pachub.py` to `/usr/local/share/pachub/`
+2. Copy `application files` to `/usr/local/share/pachub/`
 3. Create a `/usr/local/bin/pachub` launcher
 4. Install the application icon
 5. Register a `.desktop` entry so PacHub appears in your app launcher
