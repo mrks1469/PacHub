@@ -21,10 +21,17 @@ class pachubApp(Adw.Application):
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self.connect("activate", self._on_activate)
+        self.connect("shutdown", self._on_shutdown)
+
+    def _on_shutdown(self, app):
+        # Signal all background threads to stop and force-exit cleanly
+        import os, signal
+        os.kill(os.getpid(), signal.SIGTERM)
 
     def _on_activate(self, app):
         load_css()
         self.win = pachubWindow(app)
+        self.win.connect("close-request", lambda *_: self.quit())
 
         actions = {
             "sync":          self.win._on_sync_db,
