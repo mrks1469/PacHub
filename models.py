@@ -128,11 +128,24 @@ class PackageRow(Gtk.ListBoxRow):
         right.set_valign(Gtk.Align.CENTER)
         right.set_halign(Gtk.Align.END)
 
+        badges_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        badges_row.set_halign(Gtk.Align.END)
+
+        # "INSTALLED" pill for installed/update packages
+        if pkg.pkg_status in ("installed", "update"):
+            status_css = "status-update" if pkg.pkg_status == "update" else "status-installed"
+            status_text = "UPDATE" if pkg.pkg_status == "update" else "INSTALLED"
+            inst_badge = Gtk.Label(label=status_text)
+            inst_badge.add_css_class("row-status-pill")
+            inst_badge.add_css_class(status_css)
+            badges_row.append(inst_badge)
+
         repo_str = "aur" if pkg.pkg_foreign else (pkg.pkg_repo or "local")
         badge = Gtk.Label(label=repo_str.upper())
         badge.add_css_class("badge")
         badge.add_css_class(REPO_BADGE_CLASS.get(repo_str.lower(), "badge-local"))
-        right.append(badge)
+        badges_row.append(badge)
+        right.append(badges_row)
 
         ver_label = Gtk.Label(label=pkg.pkg_version)
         ver_label.add_css_class("caption")
