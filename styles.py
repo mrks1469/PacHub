@@ -43,7 +43,15 @@ CSS = """
 .badge-multilib { background: alpha(#e5a50a, 0.18); color: #c38600; }
 .badge-foreign  { background: alpha(#e66100, 0.18); color: #e66100; }
 
-/* ── Status pills ── */
+/* ── Row inline status pill (next to repo badge in list rows) ── */
+.row-status-pill {
+    border-radius: 999px;
+    padding: 1px 6px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+}
+
 .status-pill {
     border-radius: 999px;
     padding: 2px 10px;
@@ -126,6 +134,22 @@ CSS = """
 .count-update  { background: alpha(#e5a50a, 0.15); color: #c38600; }
 .count-foreign { background: alpha(#9141ac, 0.15); color: #9141ac; }
 
+/* ── Dependency chips ── */
+.dep-chip {
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: alpha(@card_fg_color, 0.07);
+    border: 1px solid alpha(@card_fg_color, 0.12);
+    min-height: 0;
+}
+.dep-chip:hover {
+    background: alpha(@accent_bg_color, 0.15);
+    border-color: alpha(@accent_bg_color, 0.35);
+    color: @accent_color;
+}
+
 /* ── Misc ── */
 .install-btn { border-radius: 8px; font-weight: 600; }
 .remove-btn  { border-radius: 8px; font-weight: 600; }
@@ -135,6 +159,16 @@ progressbar.success trough progress { background: #2ec27e; }
 progressbar.warning trough progress { background: #e5a50a; }
 progressbar trough { border-radius: 999px; min-height: 6px; }
 progressbar trough progress { border-radius: 999px; }
+
+/* Search page large entry */
+.search-page-entry {
+    font-size: 1.05rem;
+    padding: 6px 4px;
+    min-height: 42px;
+}
+.search-page-entry:focus {
+    outline: none;
+}
 """
 
 
