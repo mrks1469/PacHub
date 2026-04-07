@@ -4,6 +4,7 @@ Main application window: sidebar, search page, package list, detail panel,
 filtering, and all action handlers.
 """
 
+import shutil
 import threading
 
 import gi
@@ -15,6 +16,7 @@ from backend import (
     get_packages, get_package_info, get_package_files,
     check_updates, search_packages_cmd, run_command,
     invalidate_cache, invalidate_syncdb_cache,
+    is_safe_package_name,
 )
 from models import PackageItem, PackageRow, NavRow, REPO_BADGE_CLASS, pkg_icon
 from dialogs import (
@@ -1554,12 +1556,14 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            return
         if pkg.pkg_foreign:
             helper = self._get_aur_helper()
-            cmd = f"{helper} -S --noconfirm {pkg.pkg_name}" if helper \
-                  else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = [helper, "-S", "--noconfirm", pkg.pkg_name] if helper \
+                  else ["sudo", "-S", "pacman", "-Sy", "--noconfirm", pkg.pkg_name]
         else:
-            cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = ["sudo", "-S", "pacman", "-Sy", "--noconfirm", pkg.pkg_name]
         self._run_terminal(cmd, f"Install {pkg.pkg_name}",
                            on_success=self._refresh_selected_pkg)
 
@@ -1567,6 +1571,8 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            return
         d = Adw.AlertDialog()
         d.set_heading(f"Remove {pkg.pkg_name}?")
         d.set_body(f"This will remove {pkg.pkg_name} ({pkg.pkg_version}) from your system.")
@@ -1576,7 +1582,7 @@ class pachubWindow(Adw.ApplicationWindow):
         def on_resp(dlg, resp):
             if resp == "remove":
                 self._run_terminal(
-                    f"sudo -S pacman -R --noconfirm {pkg.pkg_name}",
+                    ["sudo", "-S", "pacman", "-R", "--noconfirm", pkg.pkg_name],
                     f"Remove {pkg.pkg_name}",
                     on_success=self._refresh_selected_pkg)
         d.connect("response", on_resp)
@@ -1586,12 +1592,14 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            return
         if pkg.pkg_foreign:
             helper = self._get_aur_helper()
-            cmd = f"{helper} -S --noconfirm {pkg.pkg_name}" if helper \
-                  else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = [helper, "-S", "--noconfirm", pkg.pkg_name] if helper \
+                  else ["sudo", "-S", "pacman", "-Sy", "--noconfirm", pkg.pkg_name]
         else:
-            cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = ["sudo", "-S", "pacman", "-Sy", "--noconfirm", pkg.pkg_name]
         self._run_terminal(cmd, f"Reinstall {pkg.pkg_name}",
                            on_success=self._refresh_selected_pkg)
 
@@ -1599,7 +1607,10 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
-        out, code = run_command(f"pacman -Qi '{pkg.pkg_name}' 2>/dev/null")
+        if not is_safe_package_name(pkg.pkg_name):
+            pkg.pkg_status = "available"
+            return
+        out, code = run_command(["pacman", "-Qi", pkg.pkg_name])
         pkg.pkg_status = "installed" if (code == 0 and out) else "available"
         installed = pkg.pkg_status == "installed"
         self.btn_install.set_sensitive(not installed)
@@ -1635,8 +1646,7 @@ class pachubWindow(Adw.ApplicationWindow):
     def _get_aur_helper(self):
         if self._aur_helper_cache is None:
             for h in ("paru", "yay", "pikaur", "trizen"):
-                _, c = run_command(f"which {h} 2>/dev/null")
-                if c == 0:
+                if shutil.which(h):
                     self._aur_helper_cache = h
                     break
         return self._aur_helper_cache

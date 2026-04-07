@@ -13,6 +13,7 @@ import pty
 import re as _re
 import select
 import fcntl
+import shlex
 import termios
 import struct
 import threading
@@ -23,6 +24,18 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Pango
 
 from backend import run_command, get_orphans, get_system_info
+
+
+def _sanitize_country_entry(raw):
+    countries = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+        if not _re.fullmatch(r"[A-Za-z][A-Za-z .'-]{0,58}", value):
+            raise ValueError(f"Invalid country value: {value}")
+        countries.append(value)
+    return countries
 
 
 # ─── Terminal dialog ──────────────────────────────────────────────────────────
@@ -63,7 +76,8 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     hdr.pack_start(cancel_btn)
     tv.add_top_bar(hdr)
 
-    cmd_lbl = Gtk.Label(label=f"$ {cmd}")
+    command_text = shlex.join(cmd) if isinstance(cmd, (list, tuple)) else cmd
+    cmd_lbl = Gtk.Label(label=f"$ {command_text}")
     cmd_lbl.add_css_class("caption")
     cmd_lbl.add_css_class("dim-label")
     cmd_lbl.set_halign(Gtk.Align.START)
@@ -225,7 +239,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
         wrapped = (
             f"printf '\\033[1m>>> {safe_title}\\033[0m\\n'; "
             f"echo; "
-            f"{cmd}; "
+            f"{command_text}; "
             f"_ec=$?; "
             f"exit $_ec"
         )
@@ -512,8 +526,12 @@ def show_mirror_rater(parent, run_terminal_fn):
             if top_n > 0:
                 global_flags.append(f"--top-mirrors={top_n}")
             if countries_raw:
-                first = countries_raw.split(",")[0].strip()
-                global_flags.append(f"--entry-country={first!r}")
+                try:
+                    first = _sanitize_country_entry(countries_raw)[0]
+                except ValueError:
+                    preview_lbl.set_label("Invalid country filter. Use letters, spaces, apostrophes, hyphens, or periods.")
+                    return
+                global_flags.append(f"--entry-country={shlex.quote(first)}")
 
             sub_flags = [f"--sort-mirrors-by={sort_key}", f"--max-delay={max_delay}"]
             gf = " ".join(global_flags)
@@ -558,8 +576,12 @@ def show_mirror_rater(parent, run_terminal_fn):
             if https_only: gflags.append("--protocol=https")
             if top_n > 0:  gflags.append(f"--top-mirrors={top_n}")
             if countries_raw:
-                first = countries_raw.split(",")[0].strip()
-                gflags.append(f"--entry-country={first!r}")
+                try:
+                    first = _sanitize_country_entry(countries_raw)[0]
+                except ValueError:
+                    preview_lbl.set_label("Invalid country filter. Use letters, spaces, apostrophes, hyphens, or periods.")
+                    return
+                gflags.append(f"--entry-country={shlex.quote(first)}")
             sflags = [f"--sort-mirrors-by={sort_key}", f"--max-delay={max_delay}"]
             preview_lbl.set_label(
                 f"rate-mirrors {' '.join(gflags)} arch {' '.join(sflags)} | sudo tee /etc/pacman.d/mirrorlist"
@@ -662,7 +684,7 @@ def show_orphan_finder(parent, run_terminal_fn):
             name = o["name"]
             rm_btn.connect("clicked", lambda *_, n=name: (
                 dialog.close(),
-                run_terminal_fn(f"sudo -S pacman -R --noconfirm {n}", f"Remove {n}")
+                run_terminal_fn(["sudo", "-S", "pacman", "-R", "--noconfirm", n], f"Remove {n}")
             ))
             row.add_suffix(rm_btn)
             listbox.append(row)
@@ -673,12 +695,11 @@ def show_orphan_finder(parent, run_terminal_fn):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_box.set_halign(Gtk.Align.CENTER)
         btn_box.set_margin_top(12); btn_box.set_margin_bottom(16)
-        names = " ".join(o["name"] for o in orphans)
         remove_all_btn = Gtk.Button(label=f"Remove All {len(orphans)} Orphans")
         remove_all_btn.add_css_class("destructive-action")
         remove_all_btn.connect("clicked", lambda *_: (
             dialog.close(),
-            run_terminal_fn(f"sudo -S pacman -Rns --noconfirm {names}", "Remove All Orphans")
+            run_terminal_fn(["sudo", "-S", "pacman", "-Rns", "--noconfirm", *(o["name"] for o in orphans)], "Remove All Orphans")
         ))
         btn_box.append(remove_all_btn)
         outer.append(btn_box)
