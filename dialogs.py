@@ -13,6 +13,8 @@ import pty
 import re as _re
 import select
 import fcntl
+import shlex
+import shutil
 import termios
 import struct
 import threading
@@ -22,7 +24,30 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Pango
 
-from backend import run_command, get_orphans, get_system_info
+from backend import (
+    get_orphans, get_system_info, is_safe_package_name, is_safe_repo_name,
+    run_command,
+)
+
+_COUNTRY_RE = _re.compile(r"^[A-Za-z][A-Za-z .'-]{0,63}$")
+
+
+def _display_cmd(cmd):
+    return shlex.join(cmd) if isinstance(cmd, (list, tuple)) else cmd
+
+
+def _editor_cmd(path):
+    allowed = {"nano", "vim", "vi", "micro", "emacs"}
+    raw = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "nano"
+    try:
+        parts = shlex.split(raw)
+    except ValueError:
+        parts = ["nano"]
+    editor = parts[0] if parts else "nano"
+    if os.path.basename(editor) not in allowed:
+        editor = "nano"
+        parts = [editor]
+    return ["sudo", "-S", *parts, path]
 
 
 # ─── Terminal dialog ──────────────────────────────────────────────────────────
@@ -63,7 +88,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     hdr.pack_start(cancel_btn)
     tv.add_top_bar(hdr)
 
-    cmd_lbl = Gtk.Label(label=f"$ {cmd}")
+    cmd_lbl = Gtk.Label(label=f"$ {_display_cmd(cmd)}")
     cmd_lbl.add_css_class("caption")
     cmd_lbl.add_css_class("dim-label")
     cmd_lbl.set_halign(Gtk.Align.START)
@@ -221,23 +246,18 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
         except Exception:
             pass
 
-        safe_title = title.replace("'", "")
-        wrapped = (
-            f"printf '\\033[1m>>> {safe_title}\\033[0m\\n'; "
-            f"echo; "
-            f"{cmd}; "
-            f"_ec=$?; "
-            f"exit $_ec"
-        )
-
         env = dict(os.environ)
         env['TERM'] = 'xterm-256color'
         env.pop('SUDO_ASKPASS', None)
 
         try:
             import subprocess
+            GLib.idle_add(append_output, f">>> {title}\n\n")
+            if isinstance(cmd, str):
+                raise TypeError("terminal commands must be argv lists")
+            popen_cmd = cmd
             proc = subprocess.Popen(
-                ["sh", "-c", wrapped],
+                popen_cmd,
                 stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
                 close_fds=True, preexec_fn=os.setsid, env=env,
             )
@@ -324,7 +344,7 @@ def show_repo_manager(parent, run_terminal_fn):
     edit_btn.add_css_class("suggested-action")
     edit_btn.connect("clicked", lambda *_: (
         dialog.close(),
-        run_terminal_fn("sudo -S ${VISUAL:-${EDITOR:-nano}} /etc/pacman.conf", "Edit pacman.conf")
+        run_terminal_fn(_editor_cmd("/etc/pacman.conf"), "Edit pacman.conf")
     ))
     hdr.pack_end(edit_btn)
 
@@ -342,8 +362,14 @@ def show_repo_manager(parent, run_terminal_fn):
     repos_group.set_title("Active Repositories")
     repos_group.set_description("Repositories currently enabled in /etc/pacman.conf")
 
-    out, code = run_command("pacman -Sl 2>/dev/null | awk '{print $1}' | sort -u")
-    repos = [r for r in out.splitlines() if r.strip()] if (out and code == 0) else ["core", "extra", "multilib"]
+    out, code = run_command(["pacman", "-Sl"])
+    repo_counts = {}
+    if out and code == 0:
+        for line in out.splitlines():
+            parts = line.split()
+            if parts and is_safe_repo_name(parts[0]):
+                repo_counts[parts[0]] = repo_counts.get(parts[0], 0) + 1
+    repos = sorted(repo_counts) if repo_counts else ["core", "extra", "multilib"]
 
     for repo in repos:
         row = Adw.ActionRow()
@@ -351,9 +377,9 @@ def show_repo_manager(parent, run_terminal_fn):
         icon = Gtk.Image.new_from_icon_name("folder-symbolic")
         icon.add_css_class("dim-label")
         row.add_prefix(icon)
-        pkg_out, _ = run_command(f"pacman -Sl {repo} 2>/dev/null | wc -l")
-        if pkg_out and pkg_out.strip().isdigit():
-            count_lbl = Gtk.Label(label=f"{pkg_out.strip()} pkgs")
+        pkg_count = repo_counts.get(repo)
+        if pkg_count is not None:
+            count_lbl = Gtk.Label(label=f"{pkg_count} pkgs")
             count_lbl.add_css_class("caption"); count_lbl.add_css_class("dim-label")
             row.add_suffix(count_lbl)
         repos_group.add(row)
@@ -368,7 +394,11 @@ def show_repo_manager(parent, run_terminal_fn):
     scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
     scroll.add_css_class("card")
 
-    conf_out, _ = run_command("cat /etc/pacman.conf 2>/dev/null")
+    try:
+        with open("/etc/pacman.conf", "r") as f:
+            conf_out = f.read()
+    except Exception:
+        conf_out = ""
     buf = Gtk.TextBuffer()
     buf.set_text(conf_out or "# /etc/pacman.conf not found or not readable")
     conf_view = Gtk.TextView(buffer=buf)
@@ -413,8 +443,7 @@ def show_mirror_rater(parent, run_terminal_fn):
     outer.set_margin_top(16);   outer.set_margin_bottom(24)
     outer.set_margin_start(16); outer.set_margin_end(16)
 
-    _, code = run_command("which rate-mirrors 2>/dev/null")
-    has_rate_mirrors = (code == 0)
+    has_rate_mirrors = shutil.which("rate-mirrors") is not None
 
     if has_rate_mirrors:
         options_group = Adw.PreferencesGroup()
@@ -508,19 +537,26 @@ def show_mirror_rater(parent, run_terminal_fn):
 
             global_flags = []
             if https_only:
-                global_flags.append("--protocol=https")
+                global_flags.append(shlex.quote("--protocol=https"))
             if top_n > 0:
-                global_flags.append(f"--top-mirrors={top_n}")
+                global_flags.append(shlex.quote(f"--top-mirrors={top_n}"))
             if countries_raw:
                 first = countries_raw.split(",")[0].strip()
-                global_flags.append(f"--entry-country={first!r}")
+                if not _COUNTRY_RE.fullmatch(first):
+                    country_entry.add_css_class("error")
+                    return
+                country_entry.remove_css_class("error")
+                global_flags.append(shlex.quote(f"--entry-country={first}"))
 
-            sub_flags = [f"--sort-mirrors-by={sort_key}", f"--max-delay={max_delay}"]
+            sub_flags = [
+                shlex.quote(f"--sort-mirrors-by={sort_key}"),
+                shlex.quote(f"--max-delay={max_delay}"),
+            ]
             gf = " ".join(global_flags)
             sf = " ".join(sub_flags)
 
             if backup:
-                cmd = (
+                script = (
                     f'sudo -S -v && '
                     f'TMPFILE="$(mktemp)" && '
                     f'rate-mirrors {gf} --save="$TMPFILE" arch {sf} '
@@ -529,12 +565,13 @@ def show_mirror_rater(parent, run_terminal_fn):
                     f'&& echo "Done — backup saved to /etc/pacman.d/mirrorlist-backup"'
                 )
             else:
-                cmd = (
+                script = (
                     f'sudo -S -v && '
                     f'rate-mirrors {gf} arch {sf} '
                     f'| sudo tee /etc/pacman.d/mirrorlist > /dev/null '
                     f'&& echo "Done — /etc/pacman.d/mirrorlist updated"'
                 )
+            cmd = ["sh", "-c", script]
 
             dialog.close()
             run_terminal_fn(cmd, "Rate Mirrors")
@@ -559,7 +596,12 @@ def show_mirror_rater(parent, run_terminal_fn):
             if top_n > 0:  gflags.append(f"--top-mirrors={top_n}")
             if countries_raw:
                 first = countries_raw.split(",")[0].strip()
-                gflags.append(f"--entry-country={first!r}")
+                if _COUNTRY_RE.fullmatch(first):
+                    country_entry.remove_css_class("error")
+                    gflags.append(f"--entry-country={first}")
+                else:
+                    country_entry.add_css_class("error")
+                    gflags.append("--entry-country=<invalid>")
             sflags = [f"--sort-mirrors-by={sort_key}", f"--max-delay={max_delay}"]
             preview_lbl.set_label(
                 f"rate-mirrors {' '.join(gflags)} arch {' '.join(sflags)} | sudo tee /etc/pacman.d/mirrorlist"
@@ -586,7 +628,7 @@ def show_mirror_rater(parent, run_terminal_fn):
         install_btn.set_halign(Gtk.Align.CENTER)
         install_btn.connect("clicked", lambda *_: (
             dialog.close(),
-            run_terminal_fn("sudo -S pacman -S --noconfirm rate-mirrors", "Install rate-mirrors")
+            run_terminal_fn(["sudo", "-S", "pacman", "-S", "rate-mirrors"], "Install rate-mirrors")
         ))
         status.set_child(install_btn)
         outer.append(status)
@@ -660,9 +702,12 @@ def show_orphan_finder(parent, run_terminal_fn):
             rm_btn.add_css_class("destructive-action"); rm_btn.add_css_class("flat")
             rm_btn.set_valign(Gtk.Align.CENTER)
             name = o["name"]
+            if not is_safe_package_name(name):
+                rm_btn.set_sensitive(False)
             rm_btn.connect("clicked", lambda *_, n=name: (
                 dialog.close(),
-                run_terminal_fn(f"sudo -S pacman -R --noconfirm {n}", f"Remove {n}")
+                run_terminal_fn(["sudo", "-S", "pacman", "-R", n], f"Remove {n}")
+                if is_safe_package_name(n) else None
             ))
             row.add_suffix(rm_btn)
             listbox.append(row)
@@ -673,12 +718,13 @@ def show_orphan_finder(parent, run_terminal_fn):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_box.set_halign(Gtk.Align.CENTER)
         btn_box.set_margin_top(12); btn_box.set_margin_bottom(16)
-        names = " ".join(o["name"] for o in orphans)
+        names = [o["name"] for o in orphans if is_safe_package_name(o["name"])]
         remove_all_btn = Gtk.Button(label=f"Remove All {len(orphans)} Orphans")
         remove_all_btn.add_css_class("destructive-action")
+        remove_all_btn.set_sensitive(len(names) == len(orphans))
         remove_all_btn.connect("clicked", lambda *_: (
             dialog.close(),
-            run_terminal_fn(f"sudo -S pacman -Rns --noconfirm {names}", "Remove All Orphans")
+            run_terminal_fn(["sudo", "-S", "pacman", "-Rns", *names], "Remove All Orphans")
         ))
         btn_box.append(remove_all_btn)
         outer.append(btn_box)

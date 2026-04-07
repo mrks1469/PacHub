@@ -13,6 +13,8 @@ Caching strategy
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import threading
 import time
@@ -59,10 +61,26 @@ def _file_age(path):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+_PKG_NAME_RE = re.compile(r"^[A-Za-z0-9@._+-]+$")
+_REPO_NAME_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
+
+
+def is_safe_package_name(name):
+    return isinstance(name, str) and bool(_PKG_NAME_RE.fullmatch(name))
+
+
+def is_safe_repo_name(name):
+    return isinstance(name, str) and bool(_REPO_NAME_RE.fullmatch(name))
+
+
 def run_command(cmd, timeout=30):
+    if isinstance(cmd, str):
+        return "Internal error: run_command requires an argv list", 1
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip(), r.returncode
+    except FileNotFoundError:
+        return "", 127
     except subprocess.TimeoutExpired:
         return "", 1
     except Exception as e:
@@ -72,9 +90,13 @@ def run_command(cmd, timeout=30):
 def run_command_stream(cmd, on_line, on_done, timeout=180):
     """Run a non-interactive command, streaming output line by line."""
     def worker():
+        if isinstance(cmd, str):
+            GLib.idle_add(on_line, "Internal error: run_command_stream requires an argv list")
+            GLib.idle_add(on_done, 1)
+            return
         try:
             proc = subprocess.Popen(
-                cmd, shell=True,
+                cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
                 text=True, bufsize=1
@@ -90,8 +112,7 @@ def run_command_stream(cmd, on_line, on_done, timeout=180):
 
 
 def _is_demo():
-    _, code = run_command("which pacman 2>/dev/null")
-    return code != 0
+    return shutil.which("pacman") is None
 
 
 # ─── Popular AUR packages to always show in the list ─────────────────────────
@@ -134,7 +155,7 @@ POPULAR_AUR_PACKAGES = [
 def _installed_fingerprint():
     """Fast fingerprint of installed packages using local DB mtime + count."""
     local_db = Path("/var/lib/pacman/local")
-    out, code = run_command("pacman -Q 2>/dev/null")
+    out, code = run_command(["pacman", "-Q"])
     if code != 0:
         return None
     # Combine package count + local db mtime for a fast, reliable fingerprint
@@ -208,7 +229,7 @@ def _build_syncdb(installed_set):
 
     # Fallback: if no .db files found, use pacman -Sl (slower)
     if not pkgs:
-        sl_out, sl_code = run_command("pacman -Sl 2>/dev/null", timeout=60)
+        sl_out, sl_code = run_command(["pacman", "-Sl"], timeout=60)
         if sl_out and sl_code == 0:
             for line in sl_out.splitlines():
                 parts = line.strip().split()
@@ -292,7 +313,7 @@ def get_packages():
             }
 
     # Step 2 — mark AUR/foreign
-    foreign_out, _ = run_command("pacman -Qm 2>/dev/null")
+    foreign_out, _ = run_command(["pacman", "-Qm"])
     for line in (foreign_out or "").splitlines():
         parts = line.strip().split(None, 1)
         if parts and parts[0] in installed_pkgs:
@@ -332,10 +353,12 @@ def invalidate_syncdb_cache():
 # ─── Package info / files ─────────────────────────────────────────────────────
 
 def get_package_info(pkg_name):
-    out, code = run_command(f"pacman -Qi '{pkg_name}' 2>/dev/null")
+    if not is_safe_package_name(pkg_name):
+        return f"Invalid package name: {pkg_name}"
+    out, code = run_command(["pacman", "-Qi", pkg_name])
     if out and code == 0:
         return out
-    out2, code2 = run_command(f"pacman -Si --noconfirm '{pkg_name}' 2>/dev/null")
+    out2, code2 = run_command(["pacman", "-Si", pkg_name])
     if out2 and code2 == 0:
         return out2
     return (f"Name           : {pkg_name}\nVersion        : 1.0.0-1\n"
@@ -349,7 +372,9 @@ def get_package_info(pkg_name):
 
 
 def get_package_files(pkg_name):
-    out, code = run_command(f"pacman -Ql '{pkg_name}' 2>/dev/null")
+    if not is_safe_package_name(pkg_name):
+        return []
+    out, code = run_command(["pacman", "-Ql", pkg_name])
     if out and code == 0:
         return out.splitlines()
     return [f"{pkg_name} /usr/bin/{pkg_name}", f"{pkg_name} /usr/share/man/man1/{pkg_name}.1"]
@@ -358,7 +383,9 @@ def get_package_files(pkg_name):
 # ─── Updates / orphans / sysinfo ─────────────────────────────────────────────
 
 def check_updates():
-    out, code = run_command("checkupdates 2>/dev/null || pacman -Qu 2>/dev/null", timeout=60)
+    out, code = run_command(["checkupdates"], timeout=60)
+    if code != 0:
+        out, code = run_command(["pacman", "-Qu"], timeout=60)
     updates = []
     if out and code == 0:
         for line in out.splitlines():
@@ -369,7 +396,7 @@ def check_updates():
 
 
 def get_orphans():
-    out, _ = run_command("pacman -Qdt 2>/dev/null")
+    out, _ = run_command(["pacman", "-Qdt"])
     orphans = []
     if out:
         for line in out.splitlines():
@@ -387,19 +414,38 @@ def get_orphans():
 
 def get_system_info():
     info = {}
-    out, _ = run_command("uname -r 2>/dev/null"); info["Kernel"] = out or "Unknown"
-    out, _ = run_command("uname -m 2>/dev/null"); info["Architecture"] = out or "x86_64"
-    out, _ = run_command("cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'")
-    info["OS"] = out or "Arch Linux"
-    out, _ = run_command("pacman --version 2>/dev/null | head -1"); info["Pacman"] = out or "6.0.x"
-    out, _ = run_command("df -h / 2>/dev/null | awk 'NR==2{print $3\"/\"$2\" (\"$5\" used)\"}'")
-    info["Disk (/)"] = out or "N/A"
-    out, _ = run_command("free -h 2>/dev/null | awk 'NR==2{print $3\"/\"$2}'")
-    info["RAM"] = out or "N/A"
-    out, _ = run_command("pacman -Q 2>/dev/null | wc -l"); info["Installed Packages"] = out or "N/A"
-    out, _ = run_command("pacman -Qm 2>/dev/null | wc -l"); info["Foreign (AUR) Packages"] = out or "0"
-    out, _ = run_command("du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1")
-    info["Package Cache Size"] = out or "N/A"
+    out, _ = run_command(["uname", "-r"]); info["Kernel"] = out or "Unknown"
+    out, _ = run_command(["uname", "-m"]); info["Architecture"] = out or "x86_64"
+    os_name = ""
+    try:
+        with open("/etc/os-release", "r") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    os_name = line.partition("=")[2].strip().strip('"')
+                    break
+    except Exception:
+        pass
+    info["OS"] = os_name or "Arch Linux"
+    out, _ = run_command(["pacman", "--version"])
+    info["Pacman"] = out.splitlines()[0] if out else "6.0.x"
+    out, _ = run_command(["df", "-h", "/"])
+    if out:
+        lines = out.splitlines()
+        parts = lines[1].split() if len(lines) > 1 else []
+        info["Disk (/)"] = f"{parts[2]}/{parts[1]} ({parts[4]} used)" if len(parts) >= 5 else "N/A"
+    else:
+        info["Disk (/)"] = "N/A"
+    out, _ = run_command(["free", "-h"])
+    if out:
+        mem_line = next((line for line in out.splitlines() if line.startswith("Mem:")), "")
+        parts = mem_line.split()
+        info["RAM"] = f"{parts[2]}/{parts[1]}" if len(parts) >= 3 else "N/A"
+    else:
+        info["RAM"] = "N/A"
+    out, _ = run_command(["pacman", "-Q"]); info["Installed Packages"] = str(len(out.splitlines())) if out else "N/A"
+    out, _ = run_command(["pacman", "-Qm"]); info["Foreign (AUR) Packages"] = str(len(out.splitlines())) if out else "0"
+    out, _ = run_command(["du", "-sh", "/var/cache/pacman/pkg"])
+    info["Package Cache Size"] = out.split()[0] if out else "N/A"
     return info
 
 
@@ -430,7 +476,7 @@ def search_packages_cmd(query):
     packages = []
     seen = set()
 
-    out, code = run_command(f"pacman -Ss '{query}' 2>/dev/null")
+    out, code = run_command(["pacman", "-Ss", query])
     if out and code == 0:
         for p in parse_pacman_ss(out):
             if p["name"] not in seen:
@@ -439,12 +485,11 @@ def search_packages_cmd(query):
 
     aur_helper = None
     for h in ("yay", "paru"):
-        _, c = run_command(f"which {h} 2>/dev/null")
-        if c == 0:
+        if shutil.which(h):
             aur_helper = h
             break
     if aur_helper:
-        aur_out, aur_code = run_command(f"{aur_helper} -Ss --aur '{query}' 2>/dev/null", timeout=30)
+        aur_out, aur_code = run_command([aur_helper, "-Ss", "--aur", query], timeout=30)
         if aur_out and aur_code == 0:
             for p in parse_pacman_ss(aur_out):
                 if p["name"] not in seen:
