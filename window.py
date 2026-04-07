@@ -1526,7 +1526,9 @@ class pachubWindow(Adw.ApplicationWindow):
             self._updates = []
             self.stat_updates._num.set_label("0")
             self._nav_rows["updates"].set_count(0)
-        self._run_terminal("sudo -S pacman -Syu --noconfirm", "System Upgrade", on_success=_after)
+        helper = self._get_aur_helper()
+        cmd = [helper, "-Syu", "--noconfirm"] if helper else ["sudo", "-S", "pacman", "-Syu", "--noconfirm"]
+        self._run_terminal(cmd, "System Upgrade", on_success=_after)
 
     def _on_clean_cache(self, *_):
         self._run_terminal(
