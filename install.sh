@@ -79,7 +79,7 @@ done
 
 if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
     warn "Installing missing packages: ${MISSING_PKGS[*]}"
-    pacman -Sy --noconfirm --needed "${MISSING_PKGS[@]}" || die "Failed to install dependencies."
+    pacman -Sy --needed "${MISSING_PKGS[@]}" || die "Failed to install dependencies."
     success "Dependencies installed."
 else
     success "All dependencies satisfied."

@@ -5,6 +5,7 @@ filtering, and all action handlers.
 """
 
 import threading
+import shutil
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -15,6 +16,7 @@ from backend import (
     get_packages, get_package_info, get_package_files,
     check_updates, search_packages_cmd, run_command,
     invalidate_cache, invalidate_syncdb_cache,
+    is_safe_package_name,
 )
 from models import PackageItem, PackageRow, NavRow, REPO_BADGE_CLASS, pkg_icon
 from dialogs import (
@@ -1504,6 +1506,15 @@ class pachubWindow(Adw.ApplicationWindow):
             self._load_packages()
         run_terminal_dialog(self, cmd, title, on_success=on_success, on_done_extra=_on_done)
 
+    def _show_toast(self, message):
+        toast = Adw.Toast()
+        toast.set_title(message)
+        toast.set_timeout(4)
+        try:
+            self._toast_overlay.add_toast(toast)
+        except AttributeError:
+            pass
+
     def _on_refresh(self, *_):
         self._all_packages = []
         self._updates = None
@@ -1518,7 +1529,7 @@ class pachubWindow(Adw.ApplicationWindow):
 
     def _on_sync_db(self, *_):
         invalidate_syncdb_cache()
-        self._run_terminal("sudo -S pacman -Sy --noconfirm", "Sync Databases")
+        self._run_terminal(["sudo", "-S", "pacman", "-Sy"], "Sync Databases")
 
     def _on_upgrade(self, *_):
         def _after():
@@ -1526,16 +1537,16 @@ class pachubWindow(Adw.ApplicationWindow):
             self._updates = []
             self.stat_updates._num.set_label("0")
             self._nav_rows["updates"].set_count(0)
-        self._run_terminal("sudo -S pacman -Syu --noconfirm", "System Upgrade", on_success=_after)
+        self._run_terminal(["sudo", "-S", "pacman", "-Syu"], "System Upgrade", on_success=_after)
 
     def _on_clean_cache(self, *_):
         self._run_terminal(
-            "sudo -S -v && { paccache -rk2 2>/dev/null || sudo pacman -Sc --noconfirm; }",
+            ["sh", "-c", "sudo -S -v && { paccache -rk2 2>/dev/null || sudo pacman -Sc; }"],
             "Clean Cache")
 
     def _on_check_updates(self, *_):
         self._run_terminal(
-            "checkupdates 2>/dev/null || pacman -Qu 2>/dev/null || echo 'No updates available'",
+            ["sh", "-c", "checkupdates 2>/dev/null || pacman -Qu 2>/dev/null || echo 'No updates available'"],
             "Check for Updates")
 
     def _on_manage_repos(self, *_):
@@ -1554,12 +1565,15 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            self._show_toast(f"Invalid package name: {pkg.pkg_name}")
+            return
         if pkg.pkg_foreign:
             helper = self._get_aur_helper()
-            cmd = f"{helper} -S --noconfirm {pkg.pkg_name}" if helper \
-                  else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = [helper, "-S", pkg.pkg_name] if helper \
+                  else ["sudo", "-S", "pacman", "-Sy", pkg.pkg_name]
         else:
-            cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = ["sudo", "-S", "pacman", "-Sy", pkg.pkg_name]
         self._run_terminal(cmd, f"Install {pkg.pkg_name}",
                            on_success=self._refresh_selected_pkg)
 
@@ -1567,6 +1581,9 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            self._show_toast(f"Invalid package name: {pkg.pkg_name}")
+            return
         d = Adw.AlertDialog()
         d.set_heading(f"Remove {pkg.pkg_name}?")
         d.set_body(f"This will remove {pkg.pkg_name} ({pkg.pkg_version}) from your system.")
@@ -1576,7 +1593,7 @@ class pachubWindow(Adw.ApplicationWindow):
         def on_resp(dlg, resp):
             if resp == "remove":
                 self._run_terminal(
-                    f"sudo -S pacman -R --noconfirm {pkg.pkg_name}",
+                    ["sudo", "-S", "pacman", "-R", pkg.pkg_name],
                     f"Remove {pkg.pkg_name}",
                     on_success=self._refresh_selected_pkg)
         d.connect("response", on_resp)
@@ -1586,12 +1603,15 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
+        if not is_safe_package_name(pkg.pkg_name):
+            self._show_toast(f"Invalid package name: {pkg.pkg_name}")
+            return
         if pkg.pkg_foreign:
             helper = self._get_aur_helper()
-            cmd = f"{helper} -S --noconfirm {pkg.pkg_name}" if helper \
-                  else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = [helper, "-S", pkg.pkg_name] if helper \
+                  else ["sudo", "-S", "pacman", "-Sy", pkg.pkg_name]
         else:
-            cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
+            cmd = ["sudo", "-S", "pacman", "-Sy", pkg.pkg_name]
         self._run_terminal(cmd, f"Reinstall {pkg.pkg_name}",
                            on_success=self._refresh_selected_pkg)
 
@@ -1599,7 +1619,9 @@ class pachubWindow(Adw.ApplicationWindow):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
-        out, code = run_command(f"pacman -Qi '{pkg.pkg_name}' 2>/dev/null")
+        if not is_safe_package_name(pkg.pkg_name):
+            return
+        out, code = run_command(["pacman", "-Qi", pkg.pkg_name])
         pkg.pkg_status = "installed" if (code == 0 and out) else "available"
         installed = pkg.pkg_status == "installed"
         self.btn_install.set_sensitive(not installed)
@@ -1635,8 +1657,7 @@ class pachubWindow(Adw.ApplicationWindow):
     def _get_aur_helper(self):
         if self._aur_helper_cache is None:
             for h in ("paru", "yay", "pikaur", "trizen"):
-                _, c = run_command(f"which {h} 2>/dev/null")
-                if c == 0:
+                if shutil.which(h):
                     self._aur_helper_cache = h
                     break
         return self._aur_helper_cache
