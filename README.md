@@ -73,7 +73,7 @@ Optional (for AUR search and install):
 
 ## Installation
 
-Place all three files in the same directory, then run:
+Place the repository files in the same directory, then run:
 
 ```bash
 chmod +x install.sh
@@ -90,14 +90,27 @@ The installer will:
 **Files required alongside `install.sh`:**
 ```
 install.sh
-pachub.py
+app.py
+backend.py
+dialogs.py
+models.py
+styles.py
+window.py
 io.github.mrks1469.pachub.svg
+```
+
+### Build a local pacman package
+
+This repository now includes a `PKGBUILD`, so you can build and install PacHub with:
+
+```bash
+makepkg -si
 ```
 
 ### Running without installing
 
 ```bash
-python3 pachub.py
+python3 app.py
 ```
 
 ## Usage
@@ -119,9 +132,15 @@ pachub
 ## Project Structure
 
 ```
-pachub.py                        # Single-file application
-io.github.mrks1469.pachub.svg   # Application icon
+app.py                           # Application entry point
+backend.py                       # Package and system data helpers
+dialogs.py                       # Modal dialogs and terminal UI
+models.py                        # Package row and model types
+styles.py                        # Shared UI styling
+window.py                        # Main application window
+io.github.mrks1469.pachub.svg    # Application icon
 install.sh                       # Installer script
+PKGBUILD                         # Local pacman package definition
 ```
 
 ## License
