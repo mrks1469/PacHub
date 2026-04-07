@@ -13,6 +13,8 @@ Caching strategy
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import threading
 import time
@@ -28,6 +30,7 @@ PKG_CACHE      = CACHE_DIR / "packages.json"
 SYNCDB_CACHE   = CACHE_DIR / "syncdb.json"
 INSTALLED_CACHE= CACHE_DIR / "installed.json"
 SYNCDB_TTL     = 6 * 3600   # 6 hours
+SAFE_PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9._+@-]+$")
 
 def _ensure_cache_dir():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -61,7 +64,13 @@ def _file_age(path):
 
 def run_command(cmd, timeout=30):
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(
+            cmd,
+            shell=isinstance(cmd, str),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
         return r.stdout.strip(), r.returncode
     except subprocess.TimeoutExpired:
         return "", 1
@@ -74,7 +83,8 @@ def run_command_stream(cmd, on_line, on_done, timeout=180):
     def worker():
         try:
             proc = subprocess.Popen(
-                cmd, shell=True,
+                cmd,
+                shell=isinstance(cmd, str),
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
                 text=True, bufsize=1
@@ -90,8 +100,18 @@ def run_command_stream(cmd, on_line, on_done, timeout=180):
 
 
 def _is_demo():
-    _, code = run_command("which pacman 2>/dev/null")
-    return code != 0
+    return shutil.which("pacman") is None
+
+
+def is_safe_package_name(name):
+    return bool(name and SAFE_PACKAGE_NAME_RE.fullmatch(name))
+
+
+def find_installed_helper(*helpers):
+    for helper in helpers:
+        if shutil.which(helper):
+            return helper
+    return None
 
 
 # ─── Popular AUR packages to always show in the list ─────────────────────────
@@ -332,10 +352,12 @@ def invalidate_syncdb_cache():
 # ─── Package info / files ─────────────────────────────────────────────────────
 
 def get_package_info(pkg_name):
-    out, code = run_command(f"pacman -Qi '{pkg_name}' 2>/dev/null")
+    if not is_safe_package_name(pkg_name):
+        return "Invalid package name."
+    out, code = run_command(["pacman", "-Qi", pkg_name])
     if out and code == 0:
         return out
-    out2, code2 = run_command(f"pacman -Si --noconfirm '{pkg_name}' 2>/dev/null")
+    out2, code2 = run_command(["pacman", "-Si", "--noconfirm", pkg_name])
     if out2 and code2 == 0:
         return out2
     return (f"Name           : {pkg_name}\nVersion        : 1.0.0-1\n"
@@ -349,7 +371,9 @@ def get_package_info(pkg_name):
 
 
 def get_package_files(pkg_name):
-    out, code = run_command(f"pacman -Ql '{pkg_name}' 2>/dev/null")
+    if not is_safe_package_name(pkg_name):
+        return ["Invalid package name."]
+    out, code = run_command(["pacman", "-Ql", pkg_name])
     if out and code == 0:
         return out.splitlines()
     return [f"{pkg_name} /usr/bin/{pkg_name}", f"{pkg_name} /usr/share/man/man1/{pkg_name}.1"]
@@ -430,21 +454,16 @@ def search_packages_cmd(query):
     packages = []
     seen = set()
 
-    out, code = run_command(f"pacman -Ss '{query}' 2>/dev/null")
+    out, code = run_command(["pacman", "-Ss", query])
     if out and code == 0:
         for p in parse_pacman_ss(out):
             if p["name"] not in seen:
                 seen.add(p["name"])
                 packages.append(p)
 
-    aur_helper = None
-    for h in ("yay", "paru"):
-        _, c = run_command(f"which {h} 2>/dev/null")
-        if c == 0:
-            aur_helper = h
-            break
+    aur_helper = find_installed_helper("yay", "paru")
     if aur_helper:
-        aur_out, aur_code = run_command(f"{aur_helper} -Ss --aur '{query}' 2>/dev/null", timeout=30)
+        aur_out, aur_code = run_command([aur_helper, "-Ss", "--aur", query], timeout=30)
         if aur_out and aur_code == 0:
             for p in parse_pacman_ss(aur_out):
                 if p["name"] not in seen:
