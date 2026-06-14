@@ -827,6 +827,8 @@ class pachubWindow(Adw.ApplicationWindow):
     def _on_packages_loaded(self, packages):
         self._all_packages = packages
         self.spinner.stop()
+        # Carry over the known update markers so a reload doesn't wipe them.
+        self._reapply_update_markers()
         self._update_sidebar_counts()
         # Only render the list if we're on a list page — skip if on Search
         if self.main_stack.get_visible_child_name() != "search":
@@ -854,14 +856,23 @@ class pachubWindow(Adw.ApplicationWindow):
         self.empty_updates_page.set_description(
             "No pending updates found." if n == 0 else f"{n} update(s) available.")
         self._update_action_bar_mode()
-        update_map = {u["name"]: u["new"] for u in updates}
+        self._reapply_update_markers()
+        if self.main_stack.get_visible_child_name() != "search":
+            self._apply_filter()
+        return False
+
+    def _reapply_update_markers(self):
+        """Sync the 'update' status on _all_packages with the current
+        self._updates set: mark pending updates and clear stale ones, so a
+        package reload (e.g. after an install/update) reflects reality."""
+        update_map = {u["name"]: u["new"] for u in (self._updates or [])}
         for pkg in self._all_packages:
             if pkg["name"] in update_map:
                 pkg["status"] = "update"
                 pkg["new_version"] = update_map[pkg["name"]]
-        if self.main_stack.get_visible_child_name() != "search":
-            self._apply_filter()
-        return False
+            elif pkg.get("status") == "update":
+                pkg["status"] = "installed"
+                pkg.pop("new_version", None)
 
     def _update_sidebar_counts(self):
         total     = len(self._all_packages)
@@ -1640,6 +1651,23 @@ class pachubWindow(Adw.ApplicationWindow):
         self.sd_btn_install.set_sensitive(not installed)
         self.sd_btn_remove.set_sensitive(installed)
         self.sd_btn_reinstall.set_sensitive(installed)
+        # If the package was a pending update and is now installed, drop it
+        # from the updates set so it leaves the Updates list right away.
+        if installed and self._updates and any(
+                u["name"] == pkg.pkg_name for u in self._updates):
+            self._updates = [u for u in self._updates
+                             if u["name"] != pkg.pkg_name]
+            n = len(self._updates)
+            self.stat_updates._num.set_label(str(n))
+            self._nav_rows["updates"].set_count(n)
+            if n == 0:
+                self.update_banner.set_revealed(False)
+            for p in self._all_packages:
+                if p["name"] == pkg.pkg_name:
+                    p["status"] = "installed"
+                    p.pop("new_version", None)
+            if self.main_stack.get_visible_child_name() != "search":
+                self._apply_filter()
         for cls in ("status-installed", "status-available", "status-update", "status-foreign"):
             self.detail_status.remove_css_class(cls)
         if installed:
