@@ -617,6 +617,17 @@ class pachubWindow(Adw.ApplicationWindow):
         panel.append(action_bar)
         return panel
 
+    @staticmethod
+    def _set_btn_label(btn, text):
+        # Buttons built by _action_btn wrap an icon + label in a Box; find the
+        # Gtk.Label child and update its text.
+        child = btn.get_child().get_first_child()
+        while child:
+            if isinstance(child, Gtk.Label):
+                child.set_label(text)
+                return
+            child = child.get_next_sibling()
+
     def _action_btn(self, icon, label, *css_classes, callback=None):
         btn = Gtk.Button()
         for cls in css_classes:
@@ -1020,9 +1031,15 @@ class pachubWindow(Adw.ApplicationWindow):
         pkg = row.pkg
         self._selected_pkg = pkg
         installed = pkg.pkg_status in ("installed", "update")
-        self._search_btn_install.set_sensitive(not installed)
+        # An "update" package is installed but upgradable — keep Install active
+        # (it runs `pacman -S`, upgrading the package) and label it "Update".
+        can_install = pkg.pkg_status != "installed"
+        install_label = "Update" if pkg.pkg_status == "update" else "Install"
+        self._set_btn_label(self._search_btn_install, install_label)
+        self._set_btn_label(self.sd_btn_install, install_label)
+        self._search_btn_install.set_sensitive(can_install)
         self._search_btn_remove.set_sensitive(installed)
-        self.sd_btn_install.set_sensitive(not installed)
+        self.sd_btn_install.set_sensitive(can_install)
         self.sd_btn_remove.set_sensitive(installed)
         self.sd_btn_reinstall.set_sensitive(installed)
         self._show_search_detail(pkg)
@@ -1177,9 +1194,15 @@ class pachubWindow(Adw.ApplicationWindow):
         pkg = row.pkg
         self._selected_pkg = pkg
         installed = pkg.pkg_status in ("installed", "update")
-        self.btn_install.set_sensitive(not installed)
+        # An "update" package is installed but upgradable — keep Install active
+        # (it runs `pacman -S`, upgrading the package) and label it "Update".
+        can_install = pkg.pkg_status != "installed"
+        install_label = "Update" if pkg.pkg_status == "update" else "Install"
+        self._set_btn_label(self.btn_install, install_label)
+        self._set_btn_label(self.detail_btn_install, install_label)
+        self.btn_install.set_sensitive(can_install)
         self.btn_remove.set_sensitive(installed)
-        self.detail_btn_install.set_sensitive(not installed)
+        self.detail_btn_install.set_sensitive(can_install)
         self.detail_btn_remove.set_sensitive(installed)
         self.detail_btn_reinstall.set_sensitive(installed)
         self._show_pkg_detail(pkg)
@@ -1604,6 +1627,9 @@ class pachubWindow(Adw.ApplicationWindow):
         out, code = run_command(f"pacman -Qi '{pkg.pkg_name}' 2>/dev/null")
         pkg.pkg_status = "installed" if (code == 0 and out) else "available"
         installed = pkg.pkg_status == "installed"
+        for _b in (self.btn_install, self.detail_btn_install,
+                   self._search_btn_install, self.sd_btn_install):
+            self._set_btn_label(_b, "Install")
         self.btn_install.set_sensitive(not installed)
         self.btn_remove.set_sensitive(installed)
         self._search_btn_install.set_sensitive(not installed)
