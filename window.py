@@ -1129,6 +1129,15 @@ class pachubWindow(Adw.ApplicationWindow):
 
     # ── Nav ───────────────────────────────────────────────────────────────────
 
+    def _grab_search_focus(self):
+        # Run-once idle callback: grab_focus() returns True, so handing it
+        # straight to GLib.idle_add re-runs it on every idle cycle, which
+        # re-selects the entry's text and makes each keystroke replace the
+        # previous character. Returning False removes the idle source.
+        self.search_entry.grab_focus()
+        self.search_entry.set_position(-1)   # cursor to end, clears selection
+        return False
+
     def _on_nav_selected(self, listbox, row):
         self.repo_listbox.unselect_all()
         keys = list(self._nav_rows.keys())
@@ -1139,7 +1148,7 @@ class pachubWindow(Adw.ApplicationWindow):
         if key == "search":
             self.main_stack.set_visible_child_name("search")
             self._current_filter = "search"
-            GLib.idle_add(self.search_entry.grab_focus)
+            GLib.idle_add(self._grab_search_focus)
             return
         if key == "orphans":
             self._on_show_orphans()
