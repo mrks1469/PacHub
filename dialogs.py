@@ -25,6 +25,26 @@ from gi.repository import Gtk, Adw, GLib, Pango
 from backend import run_command, get_orphans, get_system_info
 
 
+# ─── Adaptive dialog sizing ───────────────────────────────────────────────────
+
+def size_dialog(dialog, parent, width, height):
+    """Size a dialog to fit the parent window.
+
+    The fixed 520-720px widths these dialogs were written with leave no margin
+    on a phone in portrait (Pixel 3 is 540px logical). Clamp to the parent and
+    let narrow screens use the full width.
+    """
+    pw = parent.get_width()  if parent else 0
+    ph = parent.get_height() if parent else 0
+    # Before the parent is mapped its size reads 0 — fall back to the request.
+    if pw > 0:
+        width = min(width, pw - 24) if pw >= 720 else pw
+    if ph > 0:
+        height = min(height, ph - 24)
+    dialog.set_content_width(max(280, width))
+    dialog.set_content_height(max(320, height))
+
+
 # ─── Terminal dialog ──────────────────────────────────────────────────────────
 
 def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None):
@@ -34,8 +54,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     """
     dialog = Adw.Dialog()
     dialog.set_title(title)
-    dialog.set_content_width(720)
-    dialog.set_content_height(520)
+    size_dialog(dialog, parent, 720, 520)
     dialog.set_follows_content_size(False)
 
     tv  = Adw.ToolbarView()
@@ -313,8 +332,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
 def show_repo_manager(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Manage Repositories")
-    dialog.set_content_width(640)
-    dialog.set_content_height(500)
+    size_dialog(dialog, parent, 640, 500)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -393,8 +411,7 @@ def show_repo_manager(parent, run_terminal_fn):
 def show_mirror_rater(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Rate Mirrors")
-    dialog.set_content_width(600)
-    dialog.set_content_height(560)
+    size_dialog(dialog, parent, 600, 560)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -602,8 +619,7 @@ def show_mirror_rater(parent, run_terminal_fn):
 def show_orphan_finder(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Orphaned Packages")
-    dialog.set_content_width(560)
-    dialog.set_content_height(460)
+    size_dialog(dialog, parent, 560, 460)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -693,8 +709,7 @@ def show_orphan_finder(parent, run_terminal_fn):
 def show_sysinfo_dialog(parent):
     dialog = Adw.Dialog()
     dialog.set_title("System Information")
-    dialog.set_content_width(520)
-    dialog.set_content_height(520)
+    size_dialog(dialog, parent, 520, 520)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
