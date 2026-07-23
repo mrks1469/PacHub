@@ -9,7 +9,7 @@ import threading
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio, Pango
+from gi.repository import Gtk, Adw, GLib, Gio, Pango, Gdk
 
 from backend import (
     get_packages, get_package_info, get_package_files,
@@ -44,8 +44,23 @@ class pachubWindow(Adw.ApplicationWindow):
         self._pkg_files_all    = []
         self._alive            = True   # set False on close to stop background workers
         self.connect("close-request", self._on_close_request)
+        # The breakpoint fires only after the window is mapped, by which time
+        # the first rows are already built. Seed from the monitor so the initial
+        # render matches the layout we are about to switch to.
+        PackageRow.hide_installed_pill = self._monitor_is_narrow()
         self._build_ui()
         self._load_packages()
+
+    def _monitor_is_narrow(self):
+        """Best-effort guess at narrow before the window has a size."""
+        try:
+            d = Gdk.Display.get_default()
+            mons = d.get_monitors() if d else None
+            if mons and mons.get_n_items():
+                return mons.get_item(0).get_geometry().width <= 720
+        except Exception:
+            pass
+        return False
 
     def _on_close_request(self, *_):
         self._alive = False
@@ -165,9 +180,11 @@ class pachubWindow(Adw.ApplicationWindow):
             if narrow:
                 split.set_show_sidebar(False)
 
-        # A back button to leave the detail overlay, shown only when collapsed.
-        self._detail_back.set_visible(narrow)
-        self._sd_back.set_visible(narrow)
+        # The collapsed header already provides a back button; a second arrow in
+        # the hero is redundant. Kept hidden rather than removed so the handlers
+        # stay available if the header button is ever suppressed.
+        self._detail_back.set_visible(False)
+        self._sd_back.set_visible(False)
 
         # Switcher bars waste width in portrait; icon-only is enough.
         policy = (Adw.ViewSwitcherPolicy.NARROW if narrow
@@ -191,6 +208,9 @@ class pachubWindow(Adw.ApplicationWindow):
                 status.set_halign(Gtk.Align.FILL)
                 status.set_valign(Gtk.Align.START)
                 top.append(status)
+
+        # Rows are built lazily, so this affects every row rendered from now on.
+        PackageRow.hide_installed_pill = narrow
 
         if narrow:
             self.add_css_class("narrow")
@@ -1248,6 +1268,7 @@ class pachubWindow(Adw.ApplicationWindow):
         if key == "search":
             self.main_stack.set_visible_child_name("search")
             self._current_filter = "search"
+            self.nav_split.set_show_content(True)
             GLib.idle_add(self.search_entry.grab_focus)
             return
         if key == "orphans":
@@ -1257,6 +1278,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.main_stack.set_visible_child_name("list")
         self._update_action_bar_mode()
         self._apply_filter()
+        self.nav_split.set_show_content(True)
 
     def _on_repo_nav_selected(self, listbox, row):
         self.nav_listbox.unselect_all()
@@ -1267,6 +1289,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.main_stack.set_visible_child_name("list")
         self._update_action_bar_mode()
         self._apply_filter()
+        self.nav_split.set_show_content(True)
 
     def _update_action_bar_mode(self):
         is_updates = (self._current_filter == "updates")

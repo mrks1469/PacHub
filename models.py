@@ -86,6 +86,10 @@ class PackageItem(GObject.Object):
 # ─── Package list row ─────────────────────────────────────────────────────────
 
 class PackageRow(Gtk.ListBoxRow):
+    # Set by the window when the layout is narrow: an Installed list repeats
+    # "INSTALLED" on every row, costing width the description needs.
+    hide_installed_pill = False
+
     def __init__(self, pkg):
         super().__init__()
         self.pkg = pkg
@@ -131,14 +135,17 @@ class PackageRow(Gtk.ListBoxRow):
         badges_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         badges_row.set_halign(Gtk.Align.END)
 
-        # "INSTALLED" pill for installed/update packages
+        # "INSTALLED" pill for installed/update packages.
+        # Tagged .row-installed-pill so narrow screens can hide it — in an
+        # Installed list every row carries it, and it costs width the
+        # description needs. "UPDATE" is kept: it is not redundant.
         if pkg.pkg_status in ("installed", "update"):
-            status_css = "status-update" if pkg.pkg_status == "update" else "status-installed"
-            status_text = "UPDATE" if pkg.pkg_status == "update" else "INSTALLED"
-            inst_badge = Gtk.Label(label=status_text)
+            is_update = pkg.pkg_status == "update"
+            inst_badge = Gtk.Label(label="UPDATE" if is_update else "INSTALLED")
             inst_badge.add_css_class("row-status-pill")
-            inst_badge.add_css_class(status_css)
-            badges_row.append(inst_badge)
+            inst_badge.add_css_class("status-update" if is_update else "status-installed")
+            if not (PackageRow.hide_installed_pill and not is_update):
+                badges_row.append(inst_badge)
 
         repo_str = "aur" if pkg.pkg_foreign else (pkg.pkg_repo or "local")
         badge = Gtk.Label(label=repo_str.upper())
