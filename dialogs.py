@@ -10,6 +10,7 @@ All modal tool dialogs:
 
 import os
 import pty
+import shlex
 import re as _re
 import select
 import fcntl
@@ -52,6 +53,11 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     Open a PTY-backed terminal dialog that runs *cmd*.
     Calls on_success() (on the main thread) if the command exits with code 0.
     """
+    # Callers pass either a shell string or an argv list. A list formatted into
+    # a shell string becomes "['paru', '-Syu', ...]", which sh reports as
+    # "[paru,: command not found". Normalise once, here.
+    cmd_str = shlex.join(cmd) if isinstance(cmd, (list, tuple)) else cmd
+
     dialog = Adw.Dialog()
     dialog.set_title(title)
     size_dialog(dialog, parent, 720, 520)
@@ -82,7 +88,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     hdr.pack_start(cancel_btn)
     tv.add_top_bar(hdr)
 
-    cmd_lbl = Gtk.Label(label=f"$ {cmd}")
+    cmd_lbl = Gtk.Label(label=f"$ {cmd_str}")
     cmd_lbl.add_css_class("caption")
     cmd_lbl.add_css_class("dim-label")
     cmd_lbl.set_halign(Gtk.Align.START)
@@ -244,7 +250,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
         wrapped = (
             f"printf '\\033[1m>>> {safe_title}\\033[0m\\n'; "
             f"echo; "
-            f"{cmd}; "
+            f"{cmd_str}; "
             f"_ec=$?; "
             f"exit $_ec"
         )
