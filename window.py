@@ -42,6 +42,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self._updates          = None
         self._aur_helper_cache = None
         self._pkg_files_all    = []
+        self._search_debounce_id = 0
         self._alive            = True   # set False on close to stop background workers
         self.connect("close-request", self._on_close_request)
         # The breakpoint fires only after the window is mapped, by which time
@@ -260,6 +261,9 @@ class pachubWindow(Adw.ApplicationWindow):
         self.search_entry.set_hexpand(True)
         self.search_entry.add_css_class("search-page-entry")
         self.search_entry.connect("activate", self._on_search_activate)
+        # Live search. Debounced in _on_search_text_changed — firing a thread per
+        # keystroke would queue a rebuild of the results list on every letter.
+        self.search_entry.connect("changed", self._on_search_text_changed)
         search_row.append(self.search_entry)
 
         search_btn = Gtk.Button()
@@ -1095,7 +1099,32 @@ class pachubWindow(Adw.ApplicationWindow):
 
         threading.Thread(target=worker, args=(q,), daemon=True).start()
 
+    def _on_search_text_changed(self, entry):
+        """Debounce keystrokes into one search.
+
+        Without this every letter starts a worker, and each worker rebuilds the
+        results list — which is what made typing feel like it dropped characters.
+        """
+        if self._search_debounce_id:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = 0
+
+        if not entry.get_text().strip():
+            self._search_spinner.stop()
+            self._search_results_stack.set_visible_child_name("idle")
+            return
+
+        def fire():
+            self._search_debounce_id = 0
+            self._on_search_changed(self.search_entry)
+            return False
+
+        self._search_debounce_id = GLib.timeout_add(250, fire)
+
     def _on_search_activate(self, *_):
+        if self._search_debounce_id:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = 0
         q = self.search_entry.get_text().strip()
         if not q:
             self._search_results_stack.set_visible_child_name("idle")
@@ -1269,6 +1298,7 @@ class pachubWindow(Adw.ApplicationWindow):
             self.main_stack.set_visible_child_name("search")
             self._current_filter = "search"
             self.nav_split.set_show_content(True)
+            self._hide_detail_pane("search")
             GLib.idle_add(self.search_entry.grab_focus)
             return
         if key == "orphans":
@@ -1279,6 +1309,9 @@ class pachubWindow(Adw.ApplicationWindow):
         self._update_action_bar_mode()
         self._apply_filter()
         self.nav_split.set_show_content(True)
+        # A detail overlay left open from the previous section would cover the
+        # list you just navigated to.
+        self._hide_detail_pane("list")
 
     def _on_repo_nav_selected(self, listbox, row):
         self.nav_listbox.unselect_all()
@@ -1290,6 +1323,9 @@ class pachubWindow(Adw.ApplicationWindow):
         self._update_action_bar_mode()
         self._apply_filter()
         self.nav_split.set_show_content(True)
+        # A detail overlay left open from the previous section would cover the
+        # list you just navigated to.
+        self._hide_detail_pane("list")
 
     def _update_action_bar_mode(self):
         is_updates = (self._current_filter == "updates")
@@ -1445,6 +1481,41 @@ class pachubWindow(Adw.ApplicationWindow):
                 btn.connect("clicked", lambda b, name=dep: self._lookup_dep_in_list(name))
             flow.append(btn)
 
+    def _scroll_row_into_view(self, row):
+        """Bring a selected row into view without giving it keyboard focus.
+
+        Rows are not focusable (see PackageRow), so the old row.grab_focus()
+        no longer scrolls. Walk up to the ScrolledWindow and move the adjustment
+        so the row sits in view.
+        """
+        parent = row.get_parent()
+        scroller = None
+        while parent is not None:
+            if isinstance(parent, Gtk.ScrolledWindow):
+                scroller = parent
+                break
+            parent = parent.get_parent()
+        if scroller is None:
+            return
+
+        def do_scroll():
+            adj = scroller.get_vadjustment()
+            ok, rect = row.compute_bounds(scroller.get_child())
+            if not ok or adj is None:
+                return False
+            top    = rect.origin.y
+            bottom = top + rect.size.height
+            page   = adj.get_page_size()
+            cur    = adj.get_value()
+            if top < cur:
+                adj.set_value(top)
+            elif bottom > cur + page:
+                adj.set_value(min(bottom - page, adj.get_upper() - page))
+            return False
+
+        # Rows prepended this frame have no allocation yet — wait one loop.
+        GLib.idle_add(do_scroll)
+
     def _lookup_dep_in_list(self, pkg_name):
         """Highlight dependency in the middle panel only; leave the right panel unchanged."""
         def _highlight_in_list():
@@ -1453,7 +1524,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 if hasattr(row, "pkg") and row.pkg.pkg_name == pkg_name:
                     # Select row visually but do NOT trigger detail panel update
                     self.pkg_listbox.select_row(row)
-                    row.grab_focus()
+                    self._scroll_row_into_view(row)
                     return True
                 row = row.get_next_sibling()
             return False
@@ -1548,7 +1619,7 @@ class pachubWindow(Adw.ApplicationWindow):
             while row:
                 if hasattr(row, "pkg") and row.pkg.pkg_name == pkg_name:
                     self.search_listbox.select_row(row)
-                    row.grab_focus()
+                    self._scroll_row_into_view(row)
                     return True
                 row = row.get_next_sibling()
             return False
@@ -1567,7 +1638,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 row = PackageRow(item)
                 self.search_listbox.prepend(row)
                 self.search_listbox.select_row(row)
-                row.grab_focus()
+                self._scroll_row_into_view(row)
                 n_str = self._search_count_lbl.get_label()
                 return
 
@@ -1590,7 +1661,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 row = PackageRow(item)
                 self.search_listbox.prepend(row)
                 self.search_listbox.select_row(row)
-                row.grab_focus()
+                self._scroll_row_into_view(row)
                 return
         return False
 

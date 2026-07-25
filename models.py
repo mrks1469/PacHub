@@ -94,6 +94,11 @@ class PackageRow(Gtk.ListBoxRow):
         super().__init__()
         self.pkg = pkg
         self.set_activatable(True)
+        # Rows are tapped, not tabbed to. Leaving them focusable means GTK drags
+        # the focus ring along as the list scrolls, and .navigation-sidebar draws
+        # a focused row the same as a selected one — so the middle row always
+        # looked selected. Selection still works via select_row()/activation.
+        self.set_focusable(False)
         self.add_css_class("pkg-row")
 
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
