@@ -38,6 +38,9 @@ class pachubWindow(Adw.ApplicationWindow):
         self._updates          = None
         self._aur_helper_cache = None
         self._pkg_files_all    = []
+        self._search_debounce_id = None
+        self._sd_files_debounce_id = None
+        self._files_debounce_id = None
         self._alive            = True   # set False on close to stop background workers
         self.connect("close-request", self._on_close_request)
         self._build_ui()
@@ -158,11 +161,12 @@ class pachubWindow(Adw.ApplicationWindow):
         search_row.set_size_request(520, -1)
         search_row.add_css_class("linked")
 
-        self.search_entry = Gtk.Entry()
+        self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Search packages, e.g. firefox, vlc, git…")
         self.search_entry.set_hexpand(True)
         self.search_entry.add_css_class("search-page-entry")
         self.search_entry.connect("activate", self._on_search_activate)
+        self.search_entry.connect("search-changed", self._on_search_text_changed)
         search_row.append(self.search_entry)
 
         search_btn = Gtk.Button()
@@ -946,6 +950,27 @@ class pachubWindow(Adw.ApplicationWindow):
 
     # ── Search ────────────────────────────────────────────────────────────────
 
+    def _on_search_text_changed(self, entry):
+        """Debounce live package search so typing remains responsive."""
+        if self._search_debounce_id is not None:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = None
+
+        q = entry.get_text().strip()
+        if not q:
+            self._search_spinner.stop()
+            self._search_results_stack.set_visible_child_name("idle")
+            return
+
+        self._search_results_stack.set_visible_child_name("searching")
+        self._search_spinner.start()
+        self._search_debounce_id = GLib.timeout_add(300, self._run_pending_search)
+
+    def _run_pending_search(self):
+        self._search_debounce_id = None
+        self._on_search_changed(self.search_entry)
+        return False
+
     def _on_search_changed(self, entry):
         q = entry.get_text().strip()
         if not q:
@@ -968,6 +993,9 @@ class pachubWindow(Adw.ApplicationWindow):
         threading.Thread(target=worker, args=(q,), daemon=True).start()
 
     def _on_search_activate(self, *_):
+        if self._search_debounce_id is not None:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = None
         q = self.search_entry.get_text().strip()
         if not q:
             self._search_results_stack.set_visible_child_name("idle")
@@ -1124,8 +1152,16 @@ class pachubWindow(Adw.ApplicationWindow):
             f"{len(shown)} of {total} files" if q else f"{total} files")
 
     def _on_sd_files_search(self, entry):
+        if self._sd_files_debounce_id is not None:
+            GLib.source_remove(self._sd_files_debounce_id)
+            self._sd_files_debounce_id = None
+        self._sd_files_debounce_id = GLib.timeout_add(150, self._run_pending_sd_files_search)
+
+    def _run_pending_sd_files_search(self):
+        self._sd_files_debounce_id = None
         if hasattr(self, "_sd_files_all"):
             self._populate_sd_files(self._sd_files_all)
+        return False
 
     # ── Nav ───────────────────────────────────────────────────────────────────
 
@@ -1485,7 +1521,15 @@ class pachubWindow(Adw.ApplicationWindow):
             f"{len(shown)} of {total} files" if q else f"{total} files")
 
     def _on_files_search(self, entry):
+        if self._files_debounce_id is not None:
+            GLib.source_remove(self._files_debounce_id)
+            self._files_debounce_id = None
+        self._files_debounce_id = GLib.timeout_add(150, self._run_pending_files_search)
+
+    def _run_pending_files_search(self):
+        self._files_debounce_id = None
         self._populate_files(self._pkg_files_all)
+        return False
 
     # ── Actions ───────────────────────────────────────────────────────────────
 
