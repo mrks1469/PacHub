@@ -10,6 +10,7 @@ All modal tool dialogs:
 
 import os
 import pty
+import shlex
 import re as _re
 import select
 import fcntl
@@ -25,6 +26,26 @@ from gi.repository import Gtk, Adw, GLib, Pango
 from backend import run_command, get_orphans, get_system_info
 
 
+# ─── Adaptive dialog sizing ───────────────────────────────────────────────────
+
+def size_dialog(dialog, parent, width, height):
+    """Size a dialog to fit the parent window.
+
+    The fixed 520-720px widths these dialogs were written with leave no margin
+    on a phone in portrait (Pixel 3 is 540px logical). Clamp to the parent and
+    let narrow screens use the full width.
+    """
+    pw = parent.get_width()  if parent else 0
+    ph = parent.get_height() if parent else 0
+    # Before the parent is mapped its size reads 0 — fall back to the request.
+    if pw > 0:
+        width = min(width, pw - 24) if pw >= 720 else pw
+    if ph > 0:
+        height = min(height, ph - 24)
+    dialog.set_content_width(max(280, width))
+    dialog.set_content_height(max(320, height))
+
+
 # ─── Terminal dialog ──────────────────────────────────────────────────────────
 
 def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None):
@@ -32,10 +53,14 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     Open a PTY-backed terminal dialog that runs *cmd*.
     Calls on_success() (on the main thread) if the command exits with code 0.
     """
+    # Callers pass either a shell string or an argv list. A list formatted into
+    # a shell string becomes "['paru', '-Syu', ...]", which sh reports as
+    # "[paru,: command not found". Normalise once, here.
+    cmd_str = shlex.join(cmd) if isinstance(cmd, (list, tuple)) else cmd
+
     dialog = Adw.Dialog()
     dialog.set_title(title)
-    dialog.set_content_width(720)
-    dialog.set_content_height(520)
+    size_dialog(dialog, parent, 720, 520)
     dialog.set_follows_content_size(False)
 
     tv  = Adw.ToolbarView()
@@ -63,7 +88,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
     hdr.pack_start(cancel_btn)
     tv.add_top_bar(hdr)
 
-    cmd_lbl = Gtk.Label(label=f"$ {cmd}")
+    cmd_lbl = Gtk.Label(label=f"$ {cmd_str}")
     cmd_lbl.add_css_class("caption")
     cmd_lbl.add_css_class("dim-label")
     cmd_lbl.set_halign(Gtk.Align.START)
@@ -225,7 +250,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
         wrapped = (
             f"printf '\\033[1m>>> {safe_title}\\033[0m\\n'; "
             f"echo; "
-            f"{cmd}; "
+            f"{cmd_str}; "
             f"_ec=$?; "
             f"exit $_ec"
         )
@@ -313,8 +338,7 @@ def run_terminal_dialog(parent, cmd, title, on_success=None, on_done_extra=None)
 def show_repo_manager(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Manage Repositories")
-    dialog.set_content_width(640)
-    dialog.set_content_height(500)
+    size_dialog(dialog, parent, 640, 500)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -393,8 +417,7 @@ def show_repo_manager(parent, run_terminal_fn):
 def show_mirror_rater(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Rate Mirrors")
-    dialog.set_content_width(600)
-    dialog.set_content_height(560)
+    size_dialog(dialog, parent, 600, 560)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -602,8 +625,7 @@ def show_mirror_rater(parent, run_terminal_fn):
 def show_orphan_finder(parent, run_terminal_fn):
     dialog = Adw.Dialog()
     dialog.set_title("Orphaned Packages")
-    dialog.set_content_width(560)
-    dialog.set_content_height(460)
+    size_dialog(dialog, parent, 560, 460)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()
@@ -693,8 +715,7 @@ def show_orphan_finder(parent, run_terminal_fn):
 def show_sysinfo_dialog(parent):
     dialog = Adw.Dialog()
     dialog.set_title("System Information")
-    dialog.set_content_width(520)
-    dialog.set_content_height(520)
+    size_dialog(dialog, parent, 520, 520)
 
     tv  = Adw.ToolbarView()
     hdr = Adw.HeaderBar()

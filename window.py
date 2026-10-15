@@ -9,7 +9,7 @@ import threading
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio, Pango
+from gi.repository import Gtk, Adw, GLib, Gio, Pango, Gdk
 
 from backend import (
     get_packages, get_package_info, get_package_files,
@@ -31,17 +31,37 @@ class pachubWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self.set_title("PacHub")
         self.set_default_size(1240, 780)
-        self.set_size_request(900, 560)
+        # Minimum must fit a phone in portrait. Pixel 3 is 1080x2160 at scale 2
+        # => 540x1080 logical. A 900px minimum cannot be satisfied there and the
+        # window overflows the output.
+        self.set_size_request(360, 480)
+        self._narrow           = False
         self._all_packages     = []
         self._selected_pkg     = None
         self._current_filter   = "installed"
         self._updates          = None
         self._aur_helper_cache = None
         self._pkg_files_all    = []
+        self._search_debounce_id = 0
         self._alive            = True   # set False on close to stop background workers
         self.connect("close-request", self._on_close_request)
+        # The breakpoint fires only after the window is mapped, by which time
+        # the first rows are already built. Seed from the monitor so the initial
+        # render matches the layout we are about to switch to.
+        PackageRow.hide_installed_pill = self._monitor_is_narrow()
         self._build_ui()
         self._load_packages()
+
+    def _monitor_is_narrow(self):
+        """Best-effort guess at narrow before the window has a size."""
+        try:
+            d = Gdk.Display.get_default()
+            mons = d.get_monitors() if d else None
+            if mons and mons.get_n_items():
+                return mons.get_item(0).get_geometry().width <= 720
+        except Exception:
+            pass
+        return False
 
     def _on_close_request(self, *_):
         self._alive = False
@@ -51,8 +71,8 @@ class pachubWindow(Adw.ApplicationWindow):
 
     def _build_ui(self):
         self.nav_split = Adw.NavigationSplitView()
-        self.nav_split.set_max_sidebar_width(230)
-        self.nav_split.set_min_sidebar_width(190)
+        self.nav_split.set_max_sidebar_width(260)
+        self.nav_split.set_min_sidebar_width(160)
         self.nav_split.set_sidebar_width_fraction(0.20)
 
         # Sidebar
@@ -61,6 +81,7 @@ class pachubWindow(Adw.ApplicationWindow):
         sidebar_tv  = Adw.ToolbarView()
         sidebar_hdr = Adw.HeaderBar()
         sidebar_hdr.set_show_end_title_buttons(False)
+        self.sidebar_hdr = sidebar_hdr
         title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         app_icon  = Gtk.Image.new_from_icon_name("package-x-generic-symbolic")
         app_icon.set_pixel_size(18)
@@ -132,6 +153,82 @@ class pachubWindow(Adw.ApplicationWindow):
         self._toast_overlay.set_child(self.nav_split)
         self.set_content(self._toast_overlay)
 
+        # ── Adaptive breakpoint ───────────────────────────────────────────────
+        # Below 720 logical px there is no room for sidebar + list + detail.
+        # Collapse the sidebar into an overlay and turn both list/detail panes
+        # into drill-down navigation stacks.
+        bp = Adw.Breakpoint.new(
+            Adw.BreakpointCondition.parse("max-width: 720px"))
+        bp.connect("apply",   lambda *_: self._set_narrow(True))
+        bp.connect("unapply", lambda *_: self._set_narrow(False))
+        self.add_breakpoint(bp)
+
+    # ── Adaptive layout switching ─────────────────────────────────────────────
+
+    def _set_narrow(self, narrow):
+        """Switch between desktop (side-by-side) and phone (drill-down) layout."""
+        self._narrow = narrow
+
+        # Sidebar becomes an overlay; the back button is the only way out of it.
+        self.nav_split.set_collapsed(narrow)
+        self.content_hdr.set_show_back_button(narrow)
+        self.sidebar_hdr.set_show_end_title_buttons(narrow)
+
+        # Detail panes overlay instead of splitting, and start hidden — the list
+        # is what you want to see first on a phone.
+        for split in (self._list_split, self._search_split):
+            split.set_collapsed(narrow)
+            if narrow:
+                split.set_show_sidebar(False)
+
+        # The collapsed header already provides a back button; a second arrow in
+        # the hero is redundant. Kept hidden rather than removed so the handlers
+        # stay available if the header button is ever suppressed.
+        self._detail_back.set_visible(False)
+        self._sd_back.set_visible(False)
+
+        # Switcher bars waste width in portrait; icon-only is enough.
+        policy = (Adw.ViewSwitcherPolicy.NARROW if narrow
+                  else Adw.ViewSwitcherPolicy.WIDE)
+        self._detail_switcher.set_policy(policy)
+        self._sd_switcher.set_policy(policy)
+
+        # A 52px icon + wrapping title + status pill will not fit 540px side by
+        # side. Shrink the icon and drop the pill onto its own row.
+        for icon, status, top, meta in (
+                (self.detail_icon, self.detail_status, self._detail_top, self._detail_meta),
+                (self.sd_icon,     self.sd_status,     self._sd_top,     self._sd_meta)):
+            icon.set_pixel_size(36 if narrow else 52)
+            cur = status.get_parent()
+            if cur is not None:
+                cur.remove(status)
+            if narrow:
+                status.set_halign(Gtk.Align.START)
+                meta.prepend(status)
+            else:
+                status.set_halign(Gtk.Align.FILL)
+                status.set_valign(Gtk.Align.START)
+                top.append(status)
+
+        # Rows are built lazily, so this affects every row rendered from now on.
+        PackageRow.hide_installed_pill = narrow
+
+        if narrow:
+            self.add_css_class("narrow")
+        else:
+            self.remove_css_class("narrow")
+
+    def _show_detail_pane(self, which):
+        """Reveal the detail overlay after a row is picked (narrow mode only)."""
+        if not self._narrow:
+            return
+        split = self._list_split if which == "list" else self._search_split
+        split.set_show_sidebar(True)
+
+    def _hide_detail_pane(self, which):
+        split = self._list_split if which == "list" else self._search_split
+        split.set_show_sidebar(False)
+
     # ── Search page ───────────────────────────────────────────────────────────
 
     def _build_search_page(self):
@@ -140,8 +237,8 @@ class pachubWindow(Adw.ApplicationWindow):
         # Hero
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         hero.set_halign(Gtk.Align.FILL)
-        hero.set_margin_top(48); hero.set_margin_bottom(24)
-        hero.set_margin_start(60); hero.set_margin_end(60)
+        hero.set_margin_top(24); hero.set_margin_bottom(20)
+        hero.set_margin_start(16); hero.set_margin_end(16)
 
         headline = Gtk.Label(label="Search Packages")
         headline.add_css_class("title-1")
@@ -154,8 +251,9 @@ class pachubWindow(Adw.ApplicationWindow):
         hero.append(sub)
 
         search_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        search_row.set_halign(Gtk.Align.CENTER)
-        search_row.set_size_request(520, -1)
+        search_row.set_halign(Gtk.Align.FILL)
+        # No fixed width — 520px plus margins overflows a 540px portrait screen.
+        search_row.set_hexpand(True)
         search_row.add_css_class("linked")
 
         self.search_entry = Gtk.Entry()
@@ -163,6 +261,9 @@ class pachubWindow(Adw.ApplicationWindow):
         self.search_entry.set_hexpand(True)
         self.search_entry.add_css_class("search-page-entry")
         self.search_entry.connect("activate", self._on_search_activate)
+        # Live search. Debounced in _on_search_text_changed — firing a thread per
+        # keystroke would queue a rebuild of the results list on every letter.
+        self.search_entry.connect("changed", self._on_search_text_changed)
         search_row.append(self.search_entry)
 
         search_btn = Gtk.Button()
@@ -203,12 +304,6 @@ class pachubWindow(Adw.ApplicationWindow):
         no_results.set_description("Try different keywords or check your spelling.")
         self._search_results_stack.add_named(no_results, "empty")
 
-        # Results paned — reuses the shared detail_stack built in _build_detail_panel
-        self._search_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        self._search_paned.set_position(380)
-        self._search_paned.set_shrink_start_child(False)
-        self._search_paned.set_shrink_end_child(False)
-
         results_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         results_scroll = Gtk.ScrolledWindow()
         results_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -237,9 +332,15 @@ class pachubWindow(Adw.ApplicationWindow):
         results_action.pack_end(self._search_btn_remove)
         results_panel.append(results_action)
 
-        self._search_paned.set_start_child(results_panel)
-        self._search_paned.set_end_child(self._build_search_detail_panel())
-        self._search_results_stack.add_named(self._search_paned, "results")
+        self._results_panel = results_panel
+        self._search_split = Adw.OverlaySplitView()
+        self._search_split.set_sidebar_position(Gtk.PackType.END)
+        self._search_split.set_sidebar(self._build_search_detail_panel())
+        self._search_split.set_content(results_panel)
+        self._search_split.set_min_sidebar_width(320)
+        self._search_split.set_max_sidebar_width(560)
+        self._search_split.set_sidebar_width_fraction(0.55)
+        self._search_results_stack.add_named(self._search_split, "results")
 
         root.append(self._search_results_stack)
         return root
@@ -247,13 +348,24 @@ class pachubWindow(Adw.ApplicationWindow):
     # ── List+detail paned (Installed / AUR / Updates / Repos) ─────────────────
 
     def _build_list_detail_paned(self):
-        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        paned.set_position(380)
-        paned.set_shrink_start_child(False)
-        paned.set_shrink_end_child(False)
-        paned.set_start_child(self._build_package_list_panel())
-        paned.set_end_child(self._build_detail_panel())
-        return paned
+        """List | detail as an OverlaySplitView.
+
+        Wide: both panes side by side. Narrow (collapsed): the detail pane
+        becomes an overlay the list slides under — no re-parenting, and the
+        swipe-back gesture works. Sidebar position END puts detail on the right.
+        """
+        self._list_panel   = self._build_package_list_panel()
+        self._detail_panel = self._build_detail_panel()
+
+        split = Adw.OverlaySplitView()
+        split.set_sidebar_position(Gtk.PackType.END)
+        split.set_sidebar(self._detail_panel)
+        split.set_content(self._list_panel)
+        split.set_min_sidebar_width(320)
+        split.set_max_sidebar_width(560)
+        split.set_sidebar_width_fraction(0.55)
+        self._list_split = split
+        return split
 
 
     # ── Search detail panel (independent copy for search paned) ──────────────
@@ -272,13 +384,20 @@ class pachubWindow(Adw.ApplicationWindow):
         detail_scroll = Gtk.ScrolledWindow()
         detail_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         detail_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        detail_box.set_margin_top(16); detail_box.set_margin_bottom(24)
-        detail_box.set_margin_start(20); detail_box.set_margin_end(20)
+        detail_box.set_margin_top(12); detail_box.set_margin_bottom(20)
+        detail_box.set_margin_start(12); detail_box.set_margin_end(12)
 
         # Hero
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         hero.add_css_class("pkg-hero")
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        self._sd_back = Gtk.Button.new_from_icon_name("go-previous-symbolic")
+        self._sd_back.add_css_class("flat")
+        self._sd_back.set_valign(Gtk.Align.CENTER)
+        self._sd_back.set_tooltip_text("Back to results")
+        self._sd_back.set_visible(False)
+        self._sd_back.connect("clicked", lambda *_: self._hide_detail_pane("search"))
+        top_row.append(self._sd_back)
         self.sd_icon = Gtk.Image()
         self.sd_icon.set_pixel_size(52); self.sd_icon.set_valign(Gtk.Align.CENTER)
         self.sd_icon.set_from_icon_name("package-x-generic-symbolic")
@@ -298,6 +417,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.sd_status.add_css_class("status-pill"); self.sd_status.add_css_class("status-available")
         self.sd_status.set_valign(Gtk.Align.START)
         top_row.append(self.sd_status)
+        self._sd_top = top_row
         hero.append(top_row)
 
         meta_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -310,6 +430,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.sd_arch_badge = Gtk.Label(label="x86_64")
         self.sd_arch_badge.add_css_class("badge"); self.sd_arch_badge.add_css_class("badge-local")
         meta_row.append(self.sd_arch_badge)
+        self._sd_meta = meta_row
         hero.append(meta_row)
 
         hero_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -336,6 +457,7 @@ class pachubWindow(Adw.ApplicationWindow):
         sd_switcher = Adw.ViewSwitcher()
         sd_switcher.set_stack(self.sd_view_stack)
         sd_switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
+        self._sd_switcher = sd_switcher
         detail_box.append(sd_switcher)
 
         info_scroll = Gtk.ScrolledWindow()
@@ -646,13 +768,20 @@ class pachubWindow(Adw.ApplicationWindow):
         detail_scroll = Gtk.ScrolledWindow()
         detail_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         detail_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        detail_box.set_margin_top(16);   detail_box.set_margin_bottom(24)
-        detail_box.set_margin_start(20); detail_box.set_margin_end(20)
+        detail_box.set_margin_top(12);   detail_box.set_margin_bottom(20)
+        detail_box.set_margin_start(12); detail_box.set_margin_end(12)
 
         # Hero
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         hero.add_css_class("pkg-hero")
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        self._detail_back = Gtk.Button.new_from_icon_name("go-previous-symbolic")
+        self._detail_back.add_css_class("flat")
+        self._detail_back.set_valign(Gtk.Align.CENTER)
+        self._detail_back.set_tooltip_text("Back to package list")
+        self._detail_back.set_visible(False)
+        self._detail_back.connect("clicked", lambda *_: self._hide_detail_pane("list"))
+        top_row.append(self._detail_back)
         self.detail_icon = Gtk.Image()
         self.detail_icon.set_pixel_size(52); self.detail_icon.set_valign(Gtk.Align.CENTER)
         self.detail_icon.set_from_icon_name("package-x-generic-symbolic")
@@ -672,6 +801,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.detail_status.add_css_class("status-pill"); self.detail_status.add_css_class("status-installed")
         self.detail_status.set_valign(Gtk.Align.START)
         top_row.append(self.detail_status)
+        self._detail_top = top_row
         hero.append(top_row)
 
         meta_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -684,6 +814,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.detail_arch_badge = Gtk.Label(label="x86_64")
         self.detail_arch_badge.add_css_class("badge"); self.detail_arch_badge.add_css_class("badge-local")
         meta_row.append(self.detail_arch_badge)
+        self._detail_meta = meta_row
         hero.append(meta_row)
 
         hero_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -710,6 +841,7 @@ class pachubWindow(Adw.ApplicationWindow):
         switcher = Adw.ViewSwitcher()
         switcher.set_stack(self.detail_view_stack)
         switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
+        self._detail_switcher = switcher
         detail_box.append(switcher)
 
         # Info tab
@@ -967,7 +1099,32 @@ class pachubWindow(Adw.ApplicationWindow):
 
         threading.Thread(target=worker, args=(q,), daemon=True).start()
 
+    def _on_search_text_changed(self, entry):
+        """Debounce keystrokes into one search.
+
+        Without this every letter starts a worker, and each worker rebuilds the
+        results list — which is what made typing feel like it dropped characters.
+        """
+        if self._search_debounce_id:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = 0
+
+        if not entry.get_text().strip():
+            self._search_spinner.stop()
+            self._search_results_stack.set_visible_child_name("idle")
+            return
+
+        def fire():
+            self._search_debounce_id = 0
+            self._on_search_changed(self.search_entry)
+            return False
+
+        self._search_debounce_id = GLib.timeout_add(250, fire)
+
     def _on_search_activate(self, *_):
+        if self._search_debounce_id:
+            GLib.source_remove(self._search_debounce_id)
+            self._search_debounce_id = 0
         q = self.search_entry.get_text().strip()
         if not q:
             self._search_results_stack.set_visible_child_name("idle")
@@ -1026,6 +1183,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.sd_btn_remove.set_sensitive(installed)
         self.sd_btn_reinstall.set_sensitive(installed)
         self._show_search_detail(pkg)
+        self._show_detail_pane("search")
 
     def _show_search_detail(self, pkg):
         """Populate the search page's own detail panel."""
@@ -1139,6 +1297,8 @@ class pachubWindow(Adw.ApplicationWindow):
         if key == "search":
             self.main_stack.set_visible_child_name("search")
             self._current_filter = "search"
+            self.nav_split.set_show_content(True)
+            self._hide_detail_pane("search")
             GLib.idle_add(self.search_entry.grab_focus)
             return
         if key == "orphans":
@@ -1148,6 +1308,10 @@ class pachubWindow(Adw.ApplicationWindow):
         self.main_stack.set_visible_child_name("list")
         self._update_action_bar_mode()
         self._apply_filter()
+        self.nav_split.set_show_content(True)
+        # A detail overlay left open from the previous section would cover the
+        # list you just navigated to.
+        self._hide_detail_pane("list")
 
     def _on_repo_nav_selected(self, listbox, row):
         self.nav_listbox.unselect_all()
@@ -1158,6 +1322,10 @@ class pachubWindow(Adw.ApplicationWindow):
         self.main_stack.set_visible_child_name("list")
         self._update_action_bar_mode()
         self._apply_filter()
+        self.nav_split.set_show_content(True)
+        # A detail overlay left open from the previous section would cover the
+        # list you just navigated to.
+        self._hide_detail_pane("list")
 
     def _update_action_bar_mode(self):
         is_updates = (self._current_filter == "updates")
@@ -1183,6 +1351,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self.detail_btn_remove.set_sensitive(installed)
         self.detail_btn_reinstall.set_sensitive(installed)
         self._show_pkg_detail(pkg)
+        self._show_detail_pane("list")
 
     def _show_pkg_detail(self, pkg):
         self.detail_name.set_label(pkg.pkg_name)
@@ -1312,6 +1481,41 @@ class pachubWindow(Adw.ApplicationWindow):
                 btn.connect("clicked", lambda b, name=dep: self._lookup_dep_in_list(name))
             flow.append(btn)
 
+    def _scroll_row_into_view(self, row):
+        """Bring a selected row into view without giving it keyboard focus.
+
+        Rows are not focusable (see PackageRow), so the old row.grab_focus()
+        no longer scrolls. Walk up to the ScrolledWindow and move the adjustment
+        so the row sits in view.
+        """
+        parent = row.get_parent()
+        scroller = None
+        while parent is not None:
+            if isinstance(parent, Gtk.ScrolledWindow):
+                scroller = parent
+                break
+            parent = parent.get_parent()
+        if scroller is None:
+            return
+
+        def do_scroll():
+            adj = scroller.get_vadjustment()
+            ok, rect = row.compute_bounds(scroller.get_child())
+            if not ok or adj is None:
+                return False
+            top    = rect.origin.y
+            bottom = top + rect.size.height
+            page   = adj.get_page_size()
+            cur    = adj.get_value()
+            if top < cur:
+                adj.set_value(top)
+            elif bottom > cur + page:
+                adj.set_value(min(bottom - page, adj.get_upper() - page))
+            return False
+
+        # Rows prepended this frame have no allocation yet — wait one loop.
+        GLib.idle_add(do_scroll)
+
     def _lookup_dep_in_list(self, pkg_name):
         """Highlight dependency in the middle panel only; leave the right panel unchanged."""
         def _highlight_in_list():
@@ -1320,7 +1524,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 if hasattr(row, "pkg") and row.pkg.pkg_name == pkg_name:
                     # Select row visually but do NOT trigger detail panel update
                     self.pkg_listbox.select_row(row)
-                    row.grab_focus()
+                    self._scroll_row_into_view(row)
                     return True
                 row = row.get_next_sibling()
             return False
@@ -1415,7 +1619,7 @@ class pachubWindow(Adw.ApplicationWindow):
             while row:
                 if hasattr(row, "pkg") and row.pkg.pkg_name == pkg_name:
                     self.search_listbox.select_row(row)
-                    row.grab_focus()
+                    self._scroll_row_into_view(row)
                     return True
                 row = row.get_next_sibling()
             return False
@@ -1434,7 +1638,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 row = PackageRow(item)
                 self.search_listbox.prepend(row)
                 self.search_listbox.select_row(row)
-                row.grab_focus()
+                self._scroll_row_into_view(row)
                 n_str = self._search_count_lbl.get_label()
                 return
 
@@ -1457,7 +1661,7 @@ class pachubWindow(Adw.ApplicationWindow):
                 row = PackageRow(item)
                 self.search_listbox.prepend(row)
                 self.search_listbox.select_row(row)
-                row.grab_focus()
+                self._scroll_row_into_view(row)
                 return
         return False
 

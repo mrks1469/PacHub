@@ -169,6 +169,46 @@ progressbar trough progress { border-radius: 999px; }
 .search-page-entry:focus {
     outline: none;
 }
+
+/* ── Portrait / narrow (phone) ──────────────────────────────────────────────
+   Applied by the max-width:720px breakpoint. Desktop layout is untouched.
+   Targets are sized for a thumb: 48px is the usual floor for touch. */
+
+.narrow .nav-row label { font-size: 1rem; }
+.narrow .nav-row       { min-height: 44px; }
+
+.narrow .pkg-row { min-height: 56px; margin: 2px 4px; }
+
+/* Stat cards: three across 540px is ~170px each — drop the padding so the
+   numbers still fit rather than ellipsizing. */
+.narrow .stat-card,
+.narrow .stat-card-aur,
+.narrow .stat-card-updates { padding: 8px 2px; }
+.narrow .stat-number       { font-size: 1.2rem; }
+.narrow .stat-label        { font-size: 0.6rem; letter-spacing: 0.02em; }
+
+/* Badges and pills were sized for a mouse; bump for legibility at arm's length. */
+.narrow .badge           { font-size: 0.78rem; padding: 2px 8px; }
+.narrow .row-status-pill { font-size: 0.72rem; padding: 2px 7px; }
+.narrow .status-pill     { font-size: 0.78rem; padding: 3px 11px; }
+
+/* Dep chips are tap targets, not labels. */
+.narrow .dep-chip {
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    min-height: 40px;
+}
+
+.narrow .pkg-hero { padding: 14px; border-radius: 10px; }
+
+/* Buttons in action bars and hero rows need a thumb-sized hit area. */
+.narrow .install-btn,
+.narrow .remove-btn,
+.narrow button { min-height: 40px; }
+
+.narrow .terminal-view { font-size: 0.78rem; padding: 10px 10px; }
+
+.narrow .sidebar-section { font-size: 0.82rem; }
 """
 
 
