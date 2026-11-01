@@ -9,6 +9,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, GObject, Pango
 
+from i18n import _
+
 # ─── Repository badge mapping ─────────────────────────────────────────────────
 
 REPO_BADGE_CLASS = {
@@ -146,7 +148,8 @@ class PackageRow(Gtk.ListBoxRow):
         # description needs. "UPDATE" is kept: it is not redundant.
         if pkg.pkg_status in ("installed", "update"):
             is_update = pkg.pkg_status == "update"
-            inst_badge = Gtk.Label(label="UPDATE" if is_update else "INSTALLED")
+            inst_badge = Gtk.Label(
+                label=_("UPDATE") if is_update else _("INSTALLED"))
             inst_badge.add_css_class("row-status-pill")
             inst_badge.add_css_class("status-update" if is_update else "status-installed")
             if not (PackageRow.hide_installed_pill and not is_update):

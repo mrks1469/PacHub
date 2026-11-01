@@ -10,6 +10,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio
 
+from i18n import _
 from styles import load_css
 from window import pachubWindow
 
@@ -53,7 +54,7 @@ class pachubApp(Adw.Application):
 
         self.win.present()
 
-    def _on_about(self, *_):
+    def _on_about(self, *_args):
         about = Adw.AboutDialog()
         about.set_application_name("PacHub")
         about.set_application_icon("io.github.mrks1469.pachub")
@@ -62,7 +63,7 @@ class pachubApp(Adw.Application):
         about.set_license_type(Gtk.License.GPL_2_0)
         about.set_website("https://github.com/mrks1469/PacHub")
         about.set_issue_url("https://github.com/mrks1469/PacHub/issues")
-        about.set_comments("A powerful Pacman/AUR front end.\n")
+        about.set_comments(_("A powerful Pacman/AUR front end.\n"))
         about.set_developers(["Manpreet Singh https://github.com/mrks1469"])
         about.present(self.win)
 

@@ -28,7 +28,10 @@ DESKTOP_FILE="${DESKTOP_DIR}/${ICON_ID}.desktop"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Application Python modules (relative to SRC_DIR)
-PY_MODULES=(app.py backend.py dialogs.py models.py styles.py window.py)
+PY_MODULES=(app.py backend.py dialogs.py models.py styles.py window.py i18n.py)
+
+# Compiled translation catalogs (relative to SRC_DIR)
+LOCALE_FILES=(locale/es/LC_MESSAGES/pachub.mo)
 
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo -e "
@@ -57,6 +60,9 @@ fi
 info "Checking source files…"
 MISSING_FILES=()
 for f in "${PY_MODULES[@]}"; do
+    [[ -f "${SRC_DIR}/${f}" ]] || MISSING_FILES+=("$f")
+done
+for f in "${LOCALE_FILES[@]}"; do
     [[ -f "${SRC_DIR}/${f}" ]] || MISSING_FILES+=("$f")
 done
 [[ -f "${SRC_DIR}/${ICON_ID}.svg" ]] || MISSING_FILES+=("${ICON_ID}.svg")
@@ -94,6 +100,9 @@ install -d "$DATA_DIR"
 for f in "${PY_MODULES[@]}"; do
     install -m 644 "${SRC_DIR}/${f}" "${DATA_DIR}/${f}"
 done
+for f in "${LOCALE_FILES[@]}"; do
+    install -D -m 644 "${SRC_DIR}/${f}" "${DATA_DIR}/${f}"
+done
 success "Modules installed."
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +131,8 @@ Type=Application
 Name=PacHub
 GenericName=Package Manager
 Comment=A powerful Pacman/AUR front end
+GenericName[es]=Gestor de paquetes
+Comment[es]=Una interfaz potente para Pacman y AUR
 Exec=${INSTALL_DIR}/${APP_NAME}
 Icon=${ICON_ID}
 Categories=System;PackageManager;

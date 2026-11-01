@@ -24,6 +24,23 @@ from dialogs import (
     show_orphan_finder,
     show_sysinfo_dialog,
 )
+from i18n import _, ngettext
+
+INFO_FIELDS = [
+    ("URL", _("URL")),
+    ("Licenses", _("Licenses")),
+    ("Groups", _("Groups")),
+    ("Depends On", _("Depends On")),
+    ("Optional Deps", _("Optional Deps")),
+    ("Conflicts With", _("Conflicts With")),
+    ("Provides", _("Provides")),
+    ("Replaces", _("Replaces")),
+    ("Installed Size", _("Installed Size")),
+    ("Packager", _("Packager")),
+    ("Build Date", _("Build Date")),
+    ("Install Date", _("Install Date")),
+    ("Install Reason", _("Install Reason")),
+]
 
 
 class pachubWindow(Adw.ApplicationWindow):
@@ -106,7 +123,7 @@ class pachubWindow(Adw.ApplicationWindow):
         right_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.btn_upgrade = Gtk.Button()
         self.btn_upgrade.set_icon_name("software-update-available-symbolic")
-        self.btn_upgrade.set_tooltip_text("System upgrade (pacman -Syu)")
+        self.btn_upgrade.set_tooltip_text(_("System upgrade (pacman -Syu)"))
         self.btn_upgrade.connect("clicked", self._on_upgrade)
         self.btn_upgrade.add_css_class("suggested-action")
         right_box.append(self.btn_upgrade)
@@ -115,25 +132,25 @@ class pachubWindow(Adw.ApplicationWindow):
         menu_btn.set_icon_name("open-menu-symbolic")
         menu_btn.add_css_class("flat")
         menu = Gio.Menu()
-        menu.append("Sync Databases",       "app.sync")
-        menu.append("Check for Updates",    "app.check_updates")
-        menu.append("Refresh List",         "app.refresh")
+        menu.append(_("Sync Databases"),       "app.sync")
+        menu.append(_("Check for Updates"),    "app.check_updates")
+        menu.append(_("Refresh List"),         "app.refresh")
         menu.append_section(None, Gio.Menu())
-        menu.append("Manage Repositories…", "app.manage_repos")
-        menu.append("Rate Mirrors…",        "app.rate_mirrors")
+        menu.append(_("Manage Repositories…"), "app.manage_repos")
+        menu.append(_("Rate Mirrors…"),        "app.rate_mirrors")
         menu.append_section(None, Gio.Menu())
-        menu.append("Find Orphans",         "app.orphans")
-        menu.append("System Info",          "app.sysinfo")
-        menu.append("Cache Cleaner",        "app.cache")
+        menu.append(_("Find Orphans"),         "app.orphans")
+        menu.append(_("System Info"),          "app.sysinfo")
+        menu.append(_("Cache Cleaner"),        "app.cache")
         menu.append_section(None, Gio.Menu())
-        menu.append("About PacHub",         "app.about")
+        menu.append(_("About PacHub"),         "app.about")
         menu_btn.set_menu_model(menu)
         right_box.append(menu_btn)
         self.content_hdr.pack_end(right_box)
         self.content_tv.add_top_bar(self.content_hdr)
 
         self.update_banner = Adw.Banner()
-        self.update_banner.set_button_label("Upgrade Now")
+        self.update_banner.set_button_label(_("Upgrade Now"))
         self.update_banner.connect("button-clicked", self._on_upgrade)
         self.update_banner.set_revealed(False)
         self.content_tv.add_top_bar(self.update_banner)
@@ -240,12 +257,12 @@ class pachubWindow(Adw.ApplicationWindow):
         hero.set_margin_top(24); hero.set_margin_bottom(20)
         hero.set_margin_start(16); hero.set_margin_end(16)
 
-        headline = Gtk.Label(label="Search Packages")
+        headline = Gtk.Label(label=_("Search Packages"))
         headline.add_css_class("title-1")
         headline.set_halign(Gtk.Align.CENTER)
         hero.append(headline)
 
-        sub = Gtk.Label(label="Search official repos and AUR")
+        sub = Gtk.Label(label=_("Search official repos and AUR"))
         sub.add_css_class("body"); sub.add_css_class("dim-label")
         sub.set_halign(Gtk.Align.CENTER)
         hero.append(sub)
@@ -257,7 +274,7 @@ class pachubWindow(Adw.ApplicationWindow):
         search_row.add_css_class("linked")
 
         self.search_entry = Gtk.Entry()
-        self.search_entry.set_placeholder_text("Search packages, e.g. firefox, vlc, git…")
+        self.search_entry.set_placeholder_text(_("Search packages, e.g. firefox, vlc, git…"))
         self.search_entry.set_hexpand(True)
         self.search_entry.add_css_class("search-page-entry")
         self.search_entry.connect("activate", self._on_search_activate)
@@ -284,15 +301,15 @@ class pachubWindow(Adw.ApplicationWindow):
 
         idle_page = Adw.StatusPage()
         idle_page.set_icon_name("system-search-symbolic")
-        idle_page.set_title("Find Packages")
-        idle_page.set_description("Type above to search the official repositories and AUR.")
+        idle_page.set_title(_("Find Packages"))
+        idle_page.set_description(_("Type above to search the official repositories and AUR."))
         self._search_results_stack.add_named(idle_page, "idle")
 
         spin_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         spin_box.set_halign(Gtk.Align.CENTER); spin_box.set_valign(Gtk.Align.CENTER)
         self._search_spinner = Gtk.Spinner()
         self._search_spinner.set_size_request(36, 36)
-        spin_lbl = Gtk.Label(label="Searching…")
+        spin_lbl = Gtk.Label(label=_("Searching…"))
         spin_lbl.add_css_class("dim-label")
         spin_box.append(self._search_spinner)
         spin_box.append(spin_lbl)
@@ -300,8 +317,8 @@ class pachubWindow(Adw.ApplicationWindow):
 
         no_results = Adw.StatusPage()
         no_results.set_icon_name("system-search-symbolic")
-        no_results.set_title("No Results")
-        no_results.set_description("Try different keywords or check your spelling.")
+        no_results.set_title(_("No Results"))
+        no_results.set_description(_("Try different keywords or check your spelling."))
         self._search_results_stack.add_named(no_results, "empty")
 
         results_panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -317,7 +334,7 @@ class pachubWindow(Adw.ApplicationWindow):
 
         results_action = Gtk.ActionBar()
         self._search_btn_install = self._action_btn(
-            "package-x-generic-symbolic", "Install",
+            "package-x-generic-symbolic", _("Install"),
             "suggested-action", "install-btn", callback=self._on_install)
         self._search_btn_install.set_sensitive(False)
         results_action.pack_start(self._search_btn_install)
@@ -326,7 +343,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self._search_count_lbl.add_css_class("dim-label")
         results_action.set_center_widget(self._search_count_lbl)
         self._search_btn_remove = self._action_btn(
-            "user-trash-symbolic", "Uninstall",
+            "user-trash-symbolic", _("Uninstall"),
             "destructive-action", "remove-btn", callback=self._on_remove)
         self._search_btn_remove.set_sensitive(False)
         results_action.pack_end(self._search_btn_remove)
@@ -377,8 +394,8 @@ class pachubWindow(Adw.ApplicationWindow):
 
         empty = Adw.StatusPage()
         empty.set_icon_name("package-x-generic-symbolic")
-        empty.set_title("Select a Package")
-        empty.set_description("Choose a search result to view its details.")
+        empty.set_title(_("Select a Package"))
+        empty.set_description(_("Choose a search result to view its details."))
         self.search_detail_stack.add_named(empty, "empty")
 
         detail_scroll = Gtk.ScrolledWindow()
@@ -394,7 +411,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self._sd_back = Gtk.Button.new_from_icon_name("go-previous-symbolic")
         self._sd_back.add_css_class("flat")
         self._sd_back.set_valign(Gtk.Align.CENTER)
-        self._sd_back.set_tooltip_text("Back to results")
+        self._sd_back.set_tooltip_text(_("Back to results"))
         self._sd_back.set_visible(False)
         self._sd_back.connect("clicked", lambda *_: self._hide_detail_pane("search"))
         top_row.append(self._sd_back)
@@ -404,16 +421,16 @@ class pachubWindow(Adw.ApplicationWindow):
         top_row.append(self.sd_icon)
         title_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         title_col.set_hexpand(True); title_col.set_valign(Gtk.Align.CENTER)
-        self.sd_name = Gtk.Label(label="Package")
+        self.sd_name = Gtk.Label(label=_("Package"))
         self.sd_name.set_halign(Gtk.Align.START); self.sd_name.add_css_class("title-2")
         title_col.append(self.sd_name)
-        self.sd_desc = Gtk.Label(label="Description")
+        self.sd_desc = Gtk.Label(label=_("Description"))
         self.sd_desc.set_halign(Gtk.Align.START); self.sd_desc.add_css_class("body")
         self.sd_desc.add_css_class("dim-label"); self.sd_desc.set_wrap(True)
         self.sd_desc.set_wrap_mode(Pango.WrapMode.WORD)
         title_col.append(self.sd_desc)
         top_row.append(title_col)
-        self.sd_status = Gtk.Label(label="AVAILABLE")
+        self.sd_status = Gtk.Label(label=_("AVAILABLE"))
         self.sd_status.add_css_class("status-pill"); self.sd_status.add_css_class("status-available")
         self.sd_status.set_valign(Gtk.Align.START)
         top_row.append(self.sd_status)
@@ -435,15 +452,15 @@ class pachubWindow(Adw.ApplicationWindow):
 
         hero_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.sd_btn_install = self._action_btn(
-            "package-x-generic-symbolic", "Install",
+            "package-x-generic-symbolic", _("Install"),
             "suggested-action", "install-btn", callback=self._on_install)
         self.sd_btn_install.set_sensitive(False)
         self.sd_btn_remove = self._action_btn(
-            "user-trash-symbolic", "Uninstall",
+            "user-trash-symbolic", _("Uninstall"),
             "destructive-action", "remove-btn", callback=self._on_remove)
         self.sd_btn_remove.set_sensitive(False)
         self.sd_btn_reinstall = self._action_btn(
-            "view-refresh-symbolic", "Reinstall", callback=self._on_reinstall)
+            "view-refresh-symbolic", _("Reinstall"), callback=self._on_reinstall)
         self.sd_btn_reinstall.set_sensitive(False)
         self.sd_btn_reinstall.add_css_class("flat")
         hero_actions.append(self.sd_btn_install)
@@ -466,16 +483,14 @@ class pachubWindow(Adw.ApplicationWindow):
         info_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         info_inner.set_margin_start(4); info_inner.set_margin_end(4)
         sd_info_group = Adw.PreferencesGroup()
-        sd_info_group.set_title("Package Information")
+        sd_info_group.set_title(_("Package Information"))
         info_inner.append(sd_info_group)
         self.sd_info_rows = {}
         self.sd_dep_rows = {}
-        for key in ["URL", "Licenses", "Groups", "Depends On", "Optional Deps",
-                    "Conflicts With", "Provides", "Replaces",
-                    "Installed Size", "Packager", "Build Date", "Install Date", "Install Reason"]:
+        for key, label in INFO_FIELDS:
             if key in ("Depends On", "Optional Deps"):
                 exp_row = Adw.ExpanderRow()
-                exp_row.set_title(key); exp_row.set_subtitle("—")
+                exp_row.set_title(label); exp_row.set_subtitle("-")
                 flow = Gtk.FlowBox()
                 flow.set_selection_mode(Gtk.SelectionMode.NONE)
                 flow.set_column_spacing(6); flow.set_row_spacing(6)
@@ -490,17 +505,17 @@ class pachubWindow(Adw.ApplicationWindow):
                 self.sd_info_rows[key] = exp_row
             else:
                 row = Adw.ActionRow()
-                row.set_title(key); row.set_subtitle("—")
+                row.set_title(label); row.set_subtitle("-")
                 row.set_subtitle_selectable(True)
                 sd_info_group.add(row)
                 self.sd_info_rows[key] = row
 
         raw_group = Adw.PreferencesGroup()
-        raw_group.set_title("Raw Output")
+        raw_group.set_title(_("Raw Output"))
         info_inner.append(raw_group)
         raw_exp = Adw.ExpanderRow()
-        raw_exp.set_title("pacman -Qi output")
-        raw_exp.set_subtitle("Full package information")
+        raw_exp.set_title(_("pacman -Qi output"))
+        raw_exp.set_subtitle(_("Full package information"))
         raw_group.add(raw_exp)
         raw_scroll = Gtk.ScrolledWindow()
         raw_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -516,7 +531,7 @@ class pachubWindow(Adw.ApplicationWindow):
         raw_exp.add_row(raw_scroll)
         info_scroll.set_child(info_inner)
         self.sd_view_stack.add_titled_with_icon(
-            info_scroll, "info", "Info", "dialog-information-symbolic")
+            info_scroll, "info", _("Info"), "dialog-information-symbolic")
 
         # Files tab
         sd_files_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -524,7 +539,7 @@ class pachubWindow(Adw.ApplicationWindow):
         sd_files_hdr.set_margin_start(6); sd_files_hdr.set_margin_end(6)
         sd_files_hdr.set_margin_top(6); sd_files_hdr.set_margin_bottom(4)
         self.sd_files_search = Gtk.SearchEntry()
-        self.sd_files_search.set_placeholder_text("Filter…")
+        self.sd_files_search.set_placeholder_text(_("Filter…"))
         self.sd_files_search.set_hexpand(True)
         self.sd_files_search.connect("search-changed", self._on_sd_files_search)
         sd_files_hdr.append(self.sd_files_search)
@@ -541,7 +556,7 @@ class pachubWindow(Adw.ApplicationWindow):
         sd_files_scroll.set_child(self.sd_files_listbox)
         sd_files_box.append(sd_files_scroll)
         self.sd_view_stack.add_titled_with_icon(
-            sd_files_box, "files", "Files", "folder-symbolic")
+            sd_files_box, "files", _("Files"), "folder-symbolic")
 
         detail_box.append(self.sd_view_stack)
         detail_scroll.set_child(detail_box)
@@ -563,15 +578,15 @@ class pachubWindow(Adw.ApplicationWindow):
         stats_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         stats_box.set_margin_start(10); stats_box.set_margin_end(10)
         stats_box.set_margin_top(4); stats_box.set_margin_bottom(12)
-        self.stat_total   = self._stat_card("—", "TOTAL",   "stat-card")
-        self.stat_aur     = self._stat_card("—", "AUR",     "stat-card-aur")
-        self.stat_updates = self._stat_card("—", "UPDATES", "stat-card-updates")
+        self.stat_total   = self._stat_card("-", _("TOTAL"),   "stat-card")
+        self.stat_aur     = self._stat_card("-", _("AUR"),     "stat-card-aur")
+        self.stat_updates = self._stat_card("-", _("UPDATES"), "stat-card-updates")
         for card in (self.stat_total, self.stat_aur, self.stat_updates):
             stats_box.append(card)
         outer.append(stats_box)
 
         # Browse
-        outer.append(self._sidebar_header("BROWSE"))
+        outer.append(self._sidebar_header(_("BROWSE")))
         self.nav_listbox = Gtk.ListBox()
         self.nav_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.nav_listbox.add_css_class("navigation-sidebar")
@@ -580,10 +595,10 @@ class pachubWindow(Adw.ApplicationWindow):
 
         self._nav_rows = {}
         browse_items = [
-            ("search",    "system-search-symbolic",             "Search",        None, None),
-            ("installed", "emblem-ok-symbolic",                 "Installed",     None, None),
-            ("foreign",   "application-x-executable-symbolic", "AUR / Foreign", None, "count-foreign"),
-            ("updates",   "software-update-available-symbolic","Updates",        None, "count-update"),
+            ("search",    "system-search-symbolic",             _("Search"),        None, None),
+            ("installed", "emblem-ok-symbolic",                 _("Installed"),     None, None),
+            ("foreign",   "application-x-executable-symbolic", _("AUR / Foreign"), None, "count-foreign"),
+            ("updates",   "software-update-available-symbolic",_("Updates"),        None, "count-update"),
         ]
         for key, icon, label, cnt, badge_cls in browse_items:
             row = NavRow(icon, label, cnt, badge_cls)
@@ -594,7 +609,7 @@ class pachubWindow(Adw.ApplicationWindow):
 
         # Repositories
         outer.append(self._separator())
-        outer.append(self._sidebar_header("REPOSITORIES"))
+        outer.append(self._sidebar_header(_("REPOSITORIES")))
         self.repo_listbox = Gtk.ListBox()
         self.repo_listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.repo_listbox.add_css_class("navigation-sidebar")
@@ -618,14 +633,14 @@ class pachubWindow(Adw.ApplicationWindow):
 
         # Tools
         outer.append(self._separator())
-        outer.append(self._sidebar_header("TOOLS"))
+        outer.append(self._sidebar_header(_("TOOLS")))
         tools_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
         tools_box.set_margin_start(5); tools_box.set_margin_end(5); tools_box.set_margin_bottom(4)
         for icon_name, btn_label, cb in [
-            ("software-update-available-symbolic", "Check Updates", self._on_check_updates),
-            ("network-transmit-receive-symbolic",  "Rate Mirrors",  self._on_rate_mirrors),
-            ("user-trash-symbolic",                "Find Orphans",  self._on_show_orphans),
-            ("folder-download-symbolic",           "Clean Cache",   self._on_clean_cache),
+            ("software-update-available-symbolic", _("Check Updates"), self._on_check_updates),
+            ("network-transmit-receive-symbolic",  _("Rate Mirrors"),  self._on_rate_mirrors),
+            ("user-trash-symbolic",                _("Find Orphans"),  self._on_show_orphans),
+            ("folder-download-symbolic",           _("Clean Cache"),   self._on_clean_cache),
         ]:
             btn = Gtk.Button()
             btn.add_css_class("flat"); btn.add_css_class("nav-row")
@@ -684,19 +699,19 @@ class pachubWindow(Adw.ApplicationWindow):
         spinner_box.set_halign(Gtk.Align.CENTER); spinner_box.set_valign(Gtk.Align.CENTER)
         self.spinner = Gtk.Spinner()
         self.spinner.set_size_request(32, 32)
-        sp_lbl = Gtk.Label(label="Loading packages…")
+        sp_lbl = Gtk.Label(label=_("Loading packages…"))
         sp_lbl.add_css_class("dim-label")
         spinner_box.append(self.spinner); spinner_box.append(sp_lbl)
 
         self.empty_updates_page = Adw.StatusPage()
         self.empty_updates_page.set_icon_name("emblem-ok-symbolic")
-        self.empty_updates_page.set_title("System is up to date")
-        self.empty_updates_page.set_description("No pending updates found.")
+        self.empty_updates_page.set_title(_("System is up to date"))
+        self.empty_updates_page.set_description(_("No pending updates found."))
 
         self.empty_generic_page = Adw.StatusPage()
         self.empty_generic_page.set_icon_name("system-search-symbolic")
-        self.empty_generic_page.set_title("No Packages Found")
-        self.empty_generic_page.set_description("Try a different filter or search term.")
+        self.empty_generic_page.set_title(_("No Packages Found"))
+        self.empty_generic_page.set_description(_("Try a different filter or search term."))
 
         self.list_stack = Gtk.Stack()
         self.list_stack.set_vexpand(True)
@@ -710,7 +725,7 @@ class pachubWindow(Adw.ApplicationWindow):
 
         action_bar = Gtk.ActionBar()
         self.btn_install = self._action_btn(
-            "package-x-generic-symbolic", "Install",
+            "package-x-generic-symbolic", _("Install"),
             "suggested-action", "install-btn", callback=self._on_install)
         self.btn_install.set_sensitive(False)
         action_bar.pack_start(self.btn_install)
@@ -720,19 +735,19 @@ class pachubWindow(Adw.ApplicationWindow):
         action_bar.set_center_widget(self.pkg_count_label)
 
         self.btn_remove = self._action_btn(
-            "user-trash-symbolic", "Uninstall",
+            "user-trash-symbolic", _("Uninstall"),
             "destructive-action", "remove-btn", callback=self._on_remove)
         self.btn_remove.set_sensitive(False)
         action_bar.pack_end(self.btn_remove)
 
         self.btn_upgrade_all = self._action_btn(
-            "software-update-available-symbolic", "Upgrade All",
+            "software-update-available-symbolic", _("Upgrade All"),
             "suggested-action", callback=self._on_upgrade)
         self.btn_upgrade_all.set_sensitive(False); self.btn_upgrade_all.set_visible(False)
         action_bar.pack_start(self.btn_upgrade_all)
 
         self.btn_check_updates = self._action_btn(
-            "view-refresh-symbolic", "Check for Updates", callback=self._on_check_updates)
+            "view-refresh-symbolic", _("Check for Updates"), callback=self._on_check_updates)
         self.btn_check_updates.set_visible(False)
         action_bar.pack_end(self.btn_check_updates)
 
@@ -761,8 +776,8 @@ class pachubWindow(Adw.ApplicationWindow):
 
         empty = Adw.StatusPage()
         empty.set_icon_name("package-x-generic-symbolic")
-        empty.set_title("Select a Package")
-        empty.set_description("Choose a package to view its details, files, and dependencies.")
+        empty.set_title(_("Select a Package"))
+        empty.set_description(_("Choose a package to view its details, files, and dependencies."))
         self.detail_stack.add_named(empty, "empty")
 
         detail_scroll = Gtk.ScrolledWindow()
@@ -778,7 +793,7 @@ class pachubWindow(Adw.ApplicationWindow):
         self._detail_back = Gtk.Button.new_from_icon_name("go-previous-symbolic")
         self._detail_back.add_css_class("flat")
         self._detail_back.set_valign(Gtk.Align.CENTER)
-        self._detail_back.set_tooltip_text("Back to package list")
+        self._detail_back.set_tooltip_text(_("Back to package list"))
         self._detail_back.set_visible(False)
         self._detail_back.connect("clicked", lambda *_: self._hide_detail_pane("list"))
         top_row.append(self._detail_back)
@@ -788,16 +803,16 @@ class pachubWindow(Adw.ApplicationWindow):
         top_row.append(self.detail_icon)
         title_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         title_col.set_hexpand(True); title_col.set_valign(Gtk.Align.CENTER)
-        self.detail_name = Gtk.Label(label="Package")
+        self.detail_name = Gtk.Label(label=_("Package"))
         self.detail_name.set_halign(Gtk.Align.START); self.detail_name.add_css_class("title-2")
         title_col.append(self.detail_name)
-        self.detail_desc = Gtk.Label(label="Description")
+        self.detail_desc = Gtk.Label(label=_("Description"))
         self.detail_desc.set_halign(Gtk.Align.START); self.detail_desc.add_css_class("body")
         self.detail_desc.add_css_class("dim-label"); self.detail_desc.set_wrap(True)
         self.detail_desc.set_wrap_mode(Pango.WrapMode.WORD)
         title_col.append(self.detail_desc)
         top_row.append(title_col)
-        self.detail_status = Gtk.Label(label="INSTALLED")
+        self.detail_status = Gtk.Label(label=_("INSTALLED"))
         self.detail_status.add_css_class("status-pill"); self.detail_status.add_css_class("status-installed")
         self.detail_status.set_valign(Gtk.Align.START)
         top_row.append(self.detail_status)
@@ -819,15 +834,15 @@ class pachubWindow(Adw.ApplicationWindow):
 
         hero_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.detail_btn_install = self._action_btn(
-            "package-x-generic-symbolic", "Install",
+            "package-x-generic-symbolic", _("Install"),
             "suggested-action", "install-btn", callback=self._on_install)
         self.detail_btn_install.set_sensitive(False)
         self.detail_btn_remove = self._action_btn(
-            "user-trash-symbolic", "Uninstall",
+            "user-trash-symbolic", _("Uninstall"),
             "destructive-action", "remove-btn", callback=self._on_remove)
         self.detail_btn_remove.set_sensitive(False)
         self.detail_btn_reinstall = self._action_btn(
-            "view-refresh-symbolic", "Reinstall", callback=self._on_reinstall)
+            "view-refresh-symbolic", _("Reinstall"), callback=self._on_reinstall)
         self.detail_btn_reinstall.set_sensitive(False)
         self.detail_btn_reinstall.add_css_class("flat")
         hero_actions.append(self.detail_btn_install)
@@ -851,16 +866,14 @@ class pachubWindow(Adw.ApplicationWindow):
         info_box_inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         info_box_inner.set_margin_start(4); info_box_inner.set_margin_end(4)
         info_group = Adw.PreferencesGroup()
-        info_group.set_title("Package Information")
+        info_group.set_title(_("Package Information"))
         info_box_inner.append(info_group)
         self.info_rows = {}
         self._dep_rows = {}
-        for key in ["URL", "Licenses", "Groups", "Depends On", "Optional Deps",
-                    "Conflicts With", "Provides", "Replaces",
-                    "Installed Size", "Packager", "Build Date", "Install Date", "Install Reason"]:
+        for key, label in INFO_FIELDS:
             if key in ("Depends On", "Optional Deps"):
                 exp_row = Adw.ExpanderRow()
-                exp_row.set_title(key); exp_row.set_subtitle("—")
+                exp_row.set_title(label); exp_row.set_subtitle("-")
                 flow = Gtk.FlowBox()
                 flow.set_selection_mode(Gtk.SelectionMode.NONE)
                 flow.set_column_spacing(6); flow.set_row_spacing(6)
@@ -875,17 +888,17 @@ class pachubWindow(Adw.ApplicationWindow):
                 self.info_rows[key] = exp_row
             else:
                 row = Adw.ActionRow()
-                row.set_title(key); row.set_subtitle("—")
+                row.set_title(label); row.set_subtitle("-")
                 row.set_subtitle_selectable(True)
                 info_group.add(row)
                 self.info_rows[key] = row
 
         raw_group = Adw.PreferencesGroup()
-        raw_group.set_title("Raw Output")
+        raw_group.set_title(_("Raw Output"))
         info_box_inner.append(raw_group)
         raw_exp = Adw.ExpanderRow()
-        raw_exp.set_title("pacman -Qi output")
-        raw_exp.set_subtitle("Full package information")
+        raw_exp.set_title(_("pacman -Qi output"))
+        raw_exp.set_subtitle(_("Full package information"))
         raw_group.add(raw_exp)
         raw_scroll_inner = Gtk.ScrolledWindow()
         raw_scroll_inner.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -901,7 +914,7 @@ class pachubWindow(Adw.ApplicationWindow):
         raw_exp.add_row(raw_scroll_inner)
         info_scroll.set_child(info_box_inner)
         self.detail_view_stack.add_titled_with_icon(
-            info_scroll, "info", "Info", "dialog-information-symbolic")
+            info_scroll, "info", _("Info"), "dialog-information-symbolic")
 
         # Files tab
         files_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -909,7 +922,7 @@ class pachubWindow(Adw.ApplicationWindow):
         files_hdr.set_margin_start(6); files_hdr.set_margin_end(6)
         files_hdr.set_margin_top(6); files_hdr.set_margin_bottom(4)
         self.files_search = Gtk.SearchEntry()
-        self.files_search.set_placeholder_text("Filter…"); self.files_search.set_hexpand(True)
+        self.files_search.set_placeholder_text(_("Filter…")); self.files_search.set_hexpand(True)
         self.files_search.connect("search-changed", self._on_files_search)
         files_hdr.append(self.files_search)
         self.files_count_lbl = Gtk.Label(label="")
@@ -925,7 +938,7 @@ class pachubWindow(Adw.ApplicationWindow):
         files_scroll.set_child(self.files_listbox)
         files_box.append(files_scroll)
         self.detail_view_stack.add_titled_with_icon(
-            files_box, "files", "Files", "folder-symbolic")
+            files_box, "files", _("Files"), "folder-symbolic")
 
         detail_box.append(self.detail_view_stack)
         detail_scroll.set_child(detail_box)
@@ -968,12 +981,16 @@ class pachubWindow(Adw.ApplicationWindow):
         self.stat_updates._num.set_label(str(n))
         self._nav_rows["updates"].set_count(n)
         if n > 0:
-            self.update_banner.set_title(f"{n} update{'s' if n != 1 else ''} available")
+            self.update_banner.set_title(
+                ngettext("{n} update available", "{n} updates available", n).format(n=n))
             self.update_banner.set_revealed(True)
         else:
             self.update_banner.set_revealed(False)
-        self.empty_updates_page.set_description(
-            "No pending updates found." if n == 0 else f"{n} update(s) available.")
+        if n == 0:
+            self.empty_updates_page.set_description(_("No pending updates found."))
+        else:
+            self.empty_updates_page.set_description(
+                ngettext("{n} update available.", "{n} updates available.", n).format(n=n))
         self._update_action_bar_mode()
         update_map = {u["name"]: u["new"] for u in updates}
         for pkg in self._all_packages:
@@ -1063,8 +1080,14 @@ class pachubWindow(Adw.ApplicationWindow):
                 GLib.idle_add(append_chunk, end)
             return False
 
-        self.pkg_count_label.set_label(
-            f"{shown} of {total} packages" if shown != total else f"{total} packages")
+        if shown != total:
+            count_text = ngettext(
+                "{shown} of {total} package", "{shown} of {total} packages", total
+            ).format(shown=shown, total=total)
+        else:
+            count_text = ngettext(
+                "{total} package", "{total} packages", total).format(total=total)
+        self.pkg_count_label.set_label(count_text)
 
         if shown == 0:
             self.list_stack.set_visible_child_name(
@@ -1166,7 +1189,8 @@ class pachubWindow(Adw.ApplicationWindow):
                 pkg.get("description", ""), pkg.get("foreign", False))
             self.search_listbox.append(PackageRow(item))
         n = len(results)
-        self._search_count_lbl.set_label(f"{n} result{'s' if n != 1 else ''}")
+        self._search_count_lbl.set_label(
+            ngettext("{n} result", "{n} results", n).format(n=n))
         # Only switch to results page if not already there — avoids any redraw flash
         if self._search_results_stack.get_visible_child_name() != "results":
             self._search_results_stack.set_visible_child_name("results")
@@ -1188,7 +1212,7 @@ class pachubWindow(Adw.ApplicationWindow):
     def _show_search_detail(self, pkg):
         """Populate the search page's own detail panel."""
         self.sd_name.set_label(pkg.pkg_name)
-        self.sd_desc.set_label(pkg.pkg_description or "No description available.")
+        self.sd_desc.set_label(pkg.pkg_description or _("No description available."))
         self.sd_icon.set_from_icon_name(pkg_icon(pkg.pkg_name))
 
         repo_str = "aur" if pkg.pkg_foreign else (pkg.pkg_repo or "local").lower()
@@ -1201,29 +1225,29 @@ class pachubWindow(Adw.ApplicationWindow):
         for cls in ("status-installed", "status-available", "status-update", "status-foreign"):
             self.sd_status.remove_css_class(cls)
         if pkg.pkg_status == "update":
-            self.sd_status.set_label("UPDATE AVAILABLE")
+            self.sd_status.set_label(_("UPDATE AVAILABLE"))
             self.sd_status.add_css_class("status-update")
         elif pkg.pkg_status == "installed":
             if pkg.pkg_foreign:
-                self.sd_status.set_label("INSTALLED (AUR)")
+                self.sd_status.set_label(_("INSTALLED (AUR)"))
                 self.sd_status.add_css_class("status-foreign")
             else:
-                self.sd_status.set_label("INSTALLED")
+                self.sd_status.set_label(_("INSTALLED"))
                 self.sd_status.add_css_class("status-installed")
         else:
-            self.sd_status.set_label("AVAILABLE")
+            self.sd_status.set_label(_("AVAILABLE"))
             self.sd_status.add_css_class("status-available")
 
         self.search_detail_stack.set_visible_child_name("detail")
         for row in self.sd_info_rows.values():
             if isinstance(row, Adw.ActionRow):
                 row.set_subtitle("…")
-        for exp_row, _ in self.sd_dep_rows.values():
+        for exp_row, _row in self.sd_dep_rows.values():
             exp_row.set_subtitle("…")
-        self.sd_raw_text.set_label("Loading…")
+        self.sd_raw_text.set_label(_("Loading…"))
         while self.sd_files_listbox.get_first_child():
             self.sd_files_listbox.remove(self.sd_files_listbox.get_first_child())
-        self.sd_files_count_lbl.set_label("Loading…")
+        self.sd_files_count_lbl.set_label(_("Loading…"))
         self._sd_files_all = []
 
         def worker():
@@ -1245,9 +1269,9 @@ class pachubWindow(Adw.ApplicationWindow):
             "Install Reason": "Install Reason",
         }
         for pk, rk in field_map.items():
-            val = parsed.get(pk, "—") or "—"
+            val = parsed.get(pk, "-") or "-"
             if val in ("None", ""):
-                val = "—"
+                val = "-"
             if rk in self.sd_dep_rows:
                 exp_row, flow = self.sd_dep_rows[rk]
                 self._populate_dep_flow_widget(flow, exp_row, val, in_search=True)
@@ -1278,8 +1302,14 @@ class pachubWindow(Adw.ApplicationWindow):
             row.set_child(lbl)
             self.sd_files_listbox.append(row)
         total = sum(1 for l in files if len(l.split(None, 1)) >= 2)
-        self.sd_files_count_lbl.set_label(
-            f"{len(shown)} of {total} files" if q else f"{total} files")
+        if q:
+            count_text = ngettext(
+                "{shown} of {total} file", "{shown} of {total} files", total
+            ).format(shown=len(shown), total=total)
+        else:
+            count_text = ngettext(
+                "{total} file", "{total} files", total).format(total=total)
+        self.sd_files_count_lbl.set_label(count_text)
 
     def _on_sd_files_search(self, entry):
         if hasattr(self, "_sd_files_all"):
@@ -1355,7 +1385,7 @@ class pachubWindow(Adw.ApplicationWindow):
 
     def _show_pkg_detail(self, pkg):
         self.detail_name.set_label(pkg.pkg_name)
-        self.detail_desc.set_label(pkg.pkg_description or "No description available.")
+        self.detail_desc.set_label(pkg.pkg_description or _("No description available."))
         self.detail_icon.set_from_icon_name(pkg_icon(pkg.pkg_name))
 
         repo_str = "aur" if pkg.pkg_foreign else (pkg.pkg_repo or "local").lower()
@@ -1368,29 +1398,29 @@ class pachubWindow(Adw.ApplicationWindow):
         for cls in ("status-installed", "status-available", "status-update", "status-foreign"):
             self.detail_status.remove_css_class(cls)
         if pkg.pkg_status == "update":
-            self.detail_status.set_label("UPDATE AVAILABLE")
+            self.detail_status.set_label(_("UPDATE AVAILABLE"))
             self.detail_status.add_css_class("status-update")
         elif pkg.pkg_status == "installed":
             if pkg.pkg_foreign:
-                self.detail_status.set_label("INSTALLED (AUR)")
+                self.detail_status.set_label(_("INSTALLED (AUR)"))
                 self.detail_status.add_css_class("status-foreign")
             else:
-                self.detail_status.set_label("INSTALLED")
+                self.detail_status.set_label(_("INSTALLED"))
                 self.detail_status.add_css_class("status-installed")
         else:
-            self.detail_status.set_label("AVAILABLE")
+            self.detail_status.set_label(_("AVAILABLE"))
             self.detail_status.add_css_class("status-available")
 
         self.detail_stack.set_visible_child_name("detail")
         for row in self.info_rows.values():
             if isinstance(row, Adw.ActionRow):
                 row.set_subtitle("…")
-        for exp_row, _ in self._dep_rows.values():
+        for exp_row, _row in self._dep_rows.values():
             exp_row.set_subtitle("…")
-        self.raw_text.set_label("Loading…")
+        self.raw_text.set_label(_("Loading…"))
         while self.files_listbox.get_first_child():
             self.files_listbox.remove(self.files_listbox.get_first_child())
-        self.files_count_lbl.set_label("Loading…")
+        self.files_count_lbl.set_label(_("Loading…"))
         self._pkg_files_all = []
 
         def worker():
@@ -1412,9 +1442,9 @@ class pachubWindow(Adw.ApplicationWindow):
             "Install Reason": "Install Reason",
         }
         for pk, rk in field_map.items():
-            val = parsed.get(pk, "—") or "—"
+            val = parsed.get(pk, "-") or "-"
             if val in ("None", ""):
-                val = "—"
+                val = "-"
             if rk in self._dep_rows:
                 exp_row, flow = self._dep_rows[rk]
                 self._populate_dep_flow(flow, exp_row, val)
@@ -1447,8 +1477,8 @@ class pachubWindow(Adw.ApplicationWindow):
     def _populate_dep_flow_widget(self, flow, exp_row, val, in_search=False):
         while flow.get_first_child():
             flow.remove(flow.get_first_child())
-        if val == "—":
-            exp_row.set_subtitle("—")
+        if val == "-":
+            exp_row.set_subtitle("-")
             exp_row.set_expanded(False)
             return
         import re
@@ -1470,11 +1500,12 @@ class pachubWindow(Adw.ApplicationWindow):
         # Deduplicate while preserving order
         seen = set()
         dep_names = [d for d in dep_names if not (d in seen or seen.add(d))]
-        exp_row.set_subtitle(f"{len(dep_names)} package{'s' if len(dep_names) != 1 else ''}")
+        exp_row.set_subtitle(
+            ngettext("{n} package", "{n} packages", len(dep_names)).format(n=len(dep_names)))
         for dep in dep_names:
             btn = Gtk.Button(label=dep)
             btn.add_css_class("dep-chip")
-            btn.set_tooltip_text(f"Look up {dep}")
+            btn.set_tooltip_text(_("Look up {dep}").format(dep=dep))
             if in_search:
                 btn.connect("clicked", lambda b, name=dep: self._search_dep(name))
             else:
@@ -1595,8 +1626,14 @@ class pachubWindow(Adw.ApplicationWindow):
                 GLib.idle_add(append_chunk, end, False)
             return False
 
-        self.pkg_count_label.set_label(
-            f"{shown} of {total} packages" if shown != total else f"{total} packages")
+        if shown != total:
+            count_text = ngettext(
+                "{shown} of {total} package", "{shown} of {total} packages", total
+            ).format(shown=shown, total=total)
+        else:
+            count_text = ngettext(
+                "{total} package", "{total} packages", total).format(total=total)
+        self.pkg_count_label.set_label(count_text)
 
         if shown == 0:
             self.list_stack.set_visible_child_name(
@@ -1685,8 +1722,14 @@ class pachubWindow(Adw.ApplicationWindow):
             row.set_child(lbl)
             self.files_listbox.append(row)
         total = sum(1 for l in files if len(l.split(None, 1)) >= 2)
-        self.files_count_lbl.set_label(
-            f"{len(shown)} of {total} files" if q else f"{total} files")
+        if q:
+            count_text = ngettext(
+                "{shown} of {total} file", "{shown} of {total} files", total
+            ).format(shown=len(shown), total=total)
+        else:
+            count_text = ngettext(
+                "{total} file", "{total} files", total).format(total=total)
+        self.files_count_lbl.set_label(count_text)
 
     def _on_files_search(self, entry):
         self._populate_files(self._pkg_files_all)
@@ -1698,8 +1741,11 @@ class pachubWindow(Adw.ApplicationWindow):
             if code == 0:
                 invalidate_cache()
             toast = Adw.Toast()
-            toast.set_title(
-                f"✓ {title} completed" if code == 0 else f"✗ {title} failed (exit {code})")
+            if code == 0:
+                toast.set_title(_("✓ {title} completed").format(title=title))
+            else:
+                toast.set_title(
+                    _("✗ {title} failed (exit {code})").format(title=title, code=code))
             toast.set_timeout(4)
             try:
                 self._toast_overlay.add_toast(toast)
@@ -1720,11 +1766,11 @@ class pachubWindow(Adw.ApplicationWindow):
         self.update_banner.set_revealed(False)
         self._load_packages()
 
-    def _on_sync_db(self, *_):
+    def _on_sync_db(self, *_args):
         invalidate_syncdb_cache()
-        self._run_terminal("sudo -S pacman -Sy --noconfirm", "Sync Databases")
+        self._run_terminal("sudo -S pacman -Sy --noconfirm", _("Sync Databases"))
 
-    def _on_upgrade(self, *_):
+    def _on_upgrade(self, *_args):
         def _after():
             self.update_banner.set_revealed(False)
             self._updates = []
@@ -1732,17 +1778,17 @@ class pachubWindow(Adw.ApplicationWindow):
             self._nav_rows["updates"].set_count(0)
         helper = self._get_aur_helper()
         cmd = [helper, "-Syu", "--noconfirm"] if helper else ["sudo", "-S", "pacman", "-Syu", "--noconfirm"]
-        self._run_terminal(cmd, "System Upgrade", on_success=_after)
+        self._run_terminal(cmd, _("System Upgrade"), on_success=_after)
 
-    def _on_clean_cache(self, *_):
+    def _on_clean_cache(self, *_args):
         self._run_terminal(
             "sudo -S -v && { paccache -rk2 2>/dev/null || sudo pacman -Sc --noconfirm; }",
-            "Clean Cache")
+            _("Clean Cache"))
 
-    def _on_check_updates(self, *_):
+    def _on_check_updates(self, *_args):
         self._run_terminal(
             "checkupdates 2>/dev/null || pacman -Qu 2>/dev/null || echo 'No updates available'",
-            "Check for Updates")
+            _("Check for Updates"))
 
     def _on_manage_repos(self, *_):
         show_repo_manager(self, self._run_terminal)
@@ -1756,7 +1802,7 @@ class pachubWindow(Adw.ApplicationWindow):
     def _on_show_sysinfo(self, *_):
         show_sysinfo_dialog(self)
 
-    def _on_install(self, *_):
+    def _on_install(self, *_args):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
@@ -1766,29 +1812,31 @@ class pachubWindow(Adw.ApplicationWindow):
                   else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
         else:
             cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
-        self._run_terminal(cmd, f"Install {pkg.pkg_name}",
+        self._run_terminal(cmd, _("Install {name}").format(name=pkg.pkg_name),
                            on_success=self._refresh_selected_pkg)
 
-    def _on_remove(self, *_):
+    def _on_remove(self, *_args):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
         d = Adw.AlertDialog()
-        d.set_heading(f"Remove {pkg.pkg_name}?")
-        d.set_body(f"This will remove {pkg.pkg_name} ({pkg.pkg_version}) from your system.")
-        d.add_response("cancel", "Cancel"); d.add_response("remove", "Remove")
+        d.set_heading(_("Remove {name}?").format(name=pkg.pkg_name))
+        d.set_body(
+            _("This will remove {name} ({version}) from your system.").format(
+                name=pkg.pkg_name, version=pkg.pkg_version))
+        d.add_response("cancel", _("Cancel")); d.add_response("remove", _("Remove"))
         d.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
         d.set_default_response("cancel"); d.set_close_response("cancel")
         def on_resp(dlg, resp):
             if resp == "remove":
                 self._run_terminal(
                     f"sudo -S pacman -R --noconfirm {pkg.pkg_name}",
-                    f"Remove {pkg.pkg_name}",
+                    _("Remove {name}").format(name=pkg.pkg_name),
                     on_success=self._refresh_selected_pkg)
         d.connect("response", on_resp)
         d.present(self)
 
-    def _on_reinstall(self, *_):
+    def _on_reinstall(self, *_args):
         if not self._selected_pkg:
             return
         pkg = self._selected_pkg
@@ -1798,7 +1846,7 @@ class pachubWindow(Adw.ApplicationWindow):
                   else f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
         else:
             cmd = f"sudo -S pacman -Sy --noconfirm {pkg.pkg_name}"
-        self._run_terminal(cmd, f"Reinstall {pkg.pkg_name}",
+        self._run_terminal(cmd, _("Reinstall {name}").format(name=pkg.pkg_name),
                            on_success=self._refresh_selected_pkg)
 
     def _refresh_selected_pkg(self):
@@ -1822,13 +1870,13 @@ class pachubWindow(Adw.ApplicationWindow):
             self.detail_status.remove_css_class(cls)
         if installed:
             if pkg.pkg_foreign:
-                self.detail_status.set_label("INSTALLED (AUR)")
+                self.detail_status.set_label(_("INSTALLED (AUR)"))
                 self.detail_status.add_css_class("status-foreign")
             else:
-                self.detail_status.set_label("INSTALLED")
+                self.detail_status.set_label(_("INSTALLED"))
                 self.detail_status.add_css_class("status-installed")
         else:
-            self.detail_status.set_label("AVAILABLE")
+            self.detail_status.set_label(_("AVAILABLE"))
             self.detail_status.add_css_class("status-available")
         if installed:
             def worker():

@@ -1,0 +1,687 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PacHub package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PacHub 1.0.0\n"
+"Report-Msgid-Bugs-To: https://github.com/mrks1469/PacHub/issues\n"
+"POT-Creation-Date: 2026-11-01 21:42+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: app.py:66
+msgid "A powerful Pacman/AUR front end.\n"
+msgstr ""
+
+#: dialogs.py:81 dialogs.py:356 dialogs.py:428 dialogs.py:636 dialogs.py:734
+msgid "Close"
+msgstr ""
+
+#: dialogs.py:86 window.py:1827
+msgid "Cancel"
+msgstr ""
+
+#: dialogs.py:138
+msgid "Password or input - press Enter to send"
+msgstr ""
+
+#: dialogs.py:141
+msgid "Send"
+msgstr ""
+
+#: dialogs.py:148
+msgid "Show/hide input"
+msgstr ""
+
+#: dialogs.py:194
+msgid "(input sent)"
+msgstr ""
+
+#: dialogs.py:217
+msgid "- Cancelled -"
+msgstr ""
+
+#: dialogs.py:228
+msgid "✓  Completed successfully"
+msgstr ""
+
+#: dialogs.py:230
+#, python-brace-format
+msgid "✗  Failed  (exit code {code})"
+msgstr ""
+
+#: dialogs.py:322
+#, python-brace-format
+msgid "Internal error: {error}"
+msgstr ""
+
+#: dialogs.py:341
+msgid "Manage Repositories"
+msgstr ""
+
+#: dialogs.py:348 dialogs.py:352
+msgid "Edit pacman.conf"
+msgstr ""
+
+#: dialogs.py:367
+msgid "Active Repositories"
+msgstr ""
+
+#: dialogs.py:368
+msgid "Repositories currently enabled in /etc/pacman.conf"
+msgstr ""
+
+#: dialogs.py:383
+#, python-brace-format
+msgid "{n} pkg"
+msgid_plural "{n} pkgs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: dialogs.py:391
+msgid "/etc/pacman.conf - read-only view"
+msgstr ""
+
+#: dialogs.py:400
+msgid "# /etc/pacman.conf not found or not readable"
+msgstr ""
+
+#: dialogs.py:422 dialogs.py:566 window.py:641
+msgid "Rate Mirrors"
+msgstr ""
+
+#: dialogs.py:447
+msgid "Mirror Options"
+msgstr ""
+
+#: dialogs.py:449
+msgid ""
+"rate-mirrors tests all Arch mirrors and saves the fastest to /etc/pacman.d/"
+"mirrorlist"
+msgstr ""
+
+#: dialogs.py:453
+msgid "Countries"
+msgstr ""
+
+#: dialogs.py:454
+msgid "Comma-separated country names, or blank for all"
+msgstr ""
+
+#: dialogs.py:456
+msgid "e.g. India, Germany, France"
+msgstr ""
+
+#: dialogs.py:464
+msgid "Sort by"
+msgstr ""
+
+#: dialogs.py:465
+msgid "How mirrors are ranked"
+msgstr ""
+
+#: dialogs.py:468
+msgid "Score ↑  (best reliability first)"
+msgstr ""
+
+#: dialogs.py:469
+msgid "Score ↓  (worst reliability first)"
+msgstr ""
+
+#: dialogs.py:470
+msgid "Delay ↑  (freshest mirrors first)"
+msgstr ""
+
+#: dialogs.py:471
+msgid "Delay ↓  (oldest mirrors first)"
+msgstr ""
+
+#: dialogs.py:472
+msgid "Random   (shuffle before testing)"
+msgstr ""
+
+#: dialogs.py:483
+msgid "HTTPS only"
+msgstr ""
+
+#: dialogs.py:484
+msgid "Filter out plain HTTP mirrors"
+msgstr ""
+
+#: dialogs.py:493
+msgid "Backup current mirrorlist"
+msgstr ""
+
+#: dialogs.py:494
+msgid "Saves existing list to mirrorlist-backup first"
+msgstr ""
+
+#: dialogs.py:503
+msgid "Max mirror delay (hours)"
+msgstr ""
+
+#: dialogs.py:504
+msgid "Skip mirrors that are behind by more than this"
+msgstr ""
+
+#: dialogs.py:512
+msgid "Number of mirrors to keep"
+msgstr ""
+
+#: dialogs.py:513
+msgid "0 = keep all ranked mirrors"
+msgstr ""
+
+#: dialogs.py:522
+msgid "Find Fastest Mirrors"
+msgstr ""
+
+#: dialogs.py:605
+msgid "rate-mirrors not installed"
+msgstr ""
+
+#: dialogs.py:607
+msgid ""
+"rate-mirrors uses geo-aware routing to benchmark\n"
+"all Arch mirrors and pick the fastest ones."
+msgstr ""
+
+#: dialogs.py:610 dialogs.py:615
+msgid "Install rate-mirrors"
+msgstr ""
+
+#: dialogs.py:630
+msgid "Orphaned Packages"
+msgstr ""
+
+#: dialogs.py:650
+msgid "No Orphans Found"
+msgstr ""
+
+#: dialogs.py:651
+msgid "Your system has no orphaned packages."
+msgstr ""
+
+#: dialogs.py:663
+#, python-brace-format
+msgid "{n} orphaned package - installed as a dependency but no longer required"
+msgid_plural ""
+"{n} orphaned packages - installed as dependencies but no longer required"
+msgstr[0] ""
+msgstr[1] ""
+
+#: dialogs.py:688 window.py:1827
+msgid "Remove"
+msgstr ""
+
+#: dialogs.py:695 window.py:1834
+#, python-brace-format
+msgid "Remove {name}"
+msgstr ""
+
+#: dialogs.py:708
+#, python-brace-format
+msgid "Remove All {n} Orphan"
+msgid_plural "Remove All {n} Orphans"
+msgstr[0] ""
+msgstr[1] ""
+
+#: dialogs.py:714
+msgid "Remove All Orphans"
+msgstr ""
+
+#: dialogs.py:728
+msgid "System Information"
+msgstr ""
+
+#: dialogs.py:755
+msgid "Gathering system info…"
+msgstr ""
+
+#: dialogs.py:769
+msgid "System"
+msgstr ""
+
+#: dialogs.py:771
+msgid "OS"
+msgstr ""
+
+#: dialogs.py:772
+msgid "Kernel"
+msgstr ""
+
+#: dialogs.py:773
+msgid "Architecture"
+msgstr ""
+
+#: dialogs.py:785
+msgid "Hardware"
+msgstr ""
+
+#: dialogs.py:787
+msgid "RAM"
+msgstr ""
+
+#: dialogs.py:788
+msgid "Disk (/)"
+msgstr ""
+
+#: dialogs.py:800
+msgid "Packages"
+msgstr ""
+
+#: dialogs.py:802
+msgid "Pacman"
+msgstr ""
+
+#: dialogs.py:803
+msgid "Installed Packages"
+msgstr ""
+
+#: dialogs.py:804
+msgid "Foreign (AUR) Packages"
+msgstr ""
+
+#: dialogs.py:805
+msgid "Package Cache Size"
+msgstr ""
+
+#: models.py:152
+msgid "UPDATE"
+msgstr ""
+
+#: models.py:152 window.py:815 window.py:1235 window.py:1408 window.py:1876
+msgid "INSTALLED"
+msgstr ""
+
+#: window.py:30
+msgid "URL"
+msgstr ""
+
+#: window.py:31
+msgid "Licenses"
+msgstr ""
+
+#: window.py:32
+msgid "Groups"
+msgstr ""
+
+#: window.py:33
+msgid "Depends On"
+msgstr ""
+
+#: window.py:34
+msgid "Optional Deps"
+msgstr ""
+
+#: window.py:35
+msgid "Conflicts With"
+msgstr ""
+
+#: window.py:36
+msgid "Provides"
+msgstr ""
+
+#: window.py:37
+msgid "Replaces"
+msgstr ""
+
+#: window.py:38
+msgid "Installed Size"
+msgstr ""
+
+#: window.py:39
+msgid "Packager"
+msgstr ""
+
+#: window.py:40
+msgid "Build Date"
+msgstr ""
+
+#: window.py:41
+msgid "Install Date"
+msgstr ""
+
+#: window.py:42
+msgid "Install Reason"
+msgstr ""
+
+#: window.py:126
+msgid "System upgrade (pacman -Syu)"
+msgstr ""
+
+#: window.py:135 window.py:1771
+msgid "Sync Databases"
+msgstr ""
+
+#: window.py:136 window.py:750 window.py:1791
+msgid "Check for Updates"
+msgstr ""
+
+#: window.py:137
+msgid "Refresh List"
+msgstr ""
+
+#: window.py:139
+msgid "Manage Repositories…"
+msgstr ""
+
+#: window.py:140
+msgid "Rate Mirrors…"
+msgstr ""
+
+#: window.py:142 window.py:642
+msgid "Find Orphans"
+msgstr ""
+
+#: window.py:143
+msgid "System Info"
+msgstr ""
+
+#: window.py:144
+msgid "Cache Cleaner"
+msgstr ""
+
+#: window.py:146
+msgid "About PacHub"
+msgstr ""
+
+#: window.py:153
+msgid "Upgrade Now"
+msgstr ""
+
+#: window.py:260
+msgid "Search Packages"
+msgstr ""
+
+#: window.py:265
+msgid "Search official repos and AUR"
+msgstr ""
+
+#: window.py:277
+msgid "Search packages, e.g. firefox, vlc, git…"
+msgstr ""
+
+#: window.py:304
+msgid "Find Packages"
+msgstr ""
+
+#: window.py:305
+msgid "Type above to search the official repositories and AUR."
+msgstr ""
+
+#: window.py:312
+msgid "Searching…"
+msgstr ""
+
+#: window.py:320
+msgid "No Results"
+msgstr ""
+
+#: window.py:321
+msgid "Try different keywords or check your spelling."
+msgstr ""
+
+#: window.py:337 window.py:455 window.py:728 window.py:837
+msgid "Install"
+msgstr ""
+
+#: window.py:346 window.py:459 window.py:738 window.py:841
+msgid "Uninstall"
+msgstr ""
+
+#: window.py:397 window.py:779
+msgid "Select a Package"
+msgstr ""
+
+#: window.py:398
+msgid "Choose a search result to view its details."
+msgstr ""
+
+#: window.py:414
+msgid "Back to results"
+msgstr ""
+
+#: window.py:424 window.py:806
+msgid "Package"
+msgstr ""
+
+#: window.py:427 window.py:809
+msgid "Description"
+msgstr ""
+
+#: window.py:433 window.py:1238 window.py:1411 window.py:1879
+msgid "AVAILABLE"
+msgstr ""
+
+#: window.py:463 window.py:845
+msgid "Reinstall"
+msgstr ""
+
+#: window.py:486 window.py:869
+msgid "Package Information"
+msgstr ""
+
+#: window.py:514 window.py:897
+msgid "Raw Output"
+msgstr ""
+
+#: window.py:517 window.py:900
+msgid "pacman -Qi output"
+msgstr ""
+
+#: window.py:518 window.py:901
+msgid "Full package information"
+msgstr ""
+
+#: window.py:534 window.py:917
+msgid "Info"
+msgstr ""
+
+#: window.py:542 window.py:925
+msgid "Filter…"
+msgstr ""
+
+#: window.py:559 window.py:941
+msgid "Files"
+msgstr ""
+
+#: window.py:581
+msgid "TOTAL"
+msgstr ""
+
+#: window.py:582
+msgid "AUR"
+msgstr ""
+
+#: window.py:583
+msgid "UPDATES"
+msgstr ""
+
+#: window.py:589
+msgid "BROWSE"
+msgstr ""
+
+#: window.py:598
+msgid "Search"
+msgstr ""
+
+#: window.py:599
+msgid "Installed"
+msgstr ""
+
+#: window.py:600
+msgid "AUR / Foreign"
+msgstr ""
+
+#: window.py:601
+msgid "Updates"
+msgstr ""
+
+#: window.py:612
+msgid "REPOSITORIES"
+msgstr ""
+
+#: window.py:636
+msgid "TOOLS"
+msgstr ""
+
+#: window.py:640
+msgid "Check Updates"
+msgstr ""
+
+#: window.py:643 window.py:1786
+msgid "Clean Cache"
+msgstr ""
+
+#: window.py:702
+msgid "Loading packages…"
+msgstr ""
+
+#: window.py:708
+msgid "System is up to date"
+msgstr ""
+
+#: window.py:709 window.py:990
+msgid "No pending updates found."
+msgstr ""
+
+#: window.py:713
+msgid "No Packages Found"
+msgstr ""
+
+#: window.py:714
+msgid "Try a different filter or search term."
+msgstr ""
+
+#: window.py:744
+msgid "Upgrade All"
+msgstr ""
+
+#: window.py:780
+msgid "Choose a package to view its details, files, and dependencies."
+msgstr ""
+
+#: window.py:796
+msgid "Back to package list"
+msgstr ""
+
+#: window.py:985
+#, python-brace-format
+msgid "{n} update available"
+msgid_plural "{n} updates available"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:993
+#, python-brace-format
+msgid "{n} update available."
+msgid_plural "{n} updates available."
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1085 window.py:1631
+#, python-brace-format
+msgid "{shown} of {total} package"
+msgid_plural "{shown} of {total} packages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1089 window.py:1635
+#, python-brace-format
+msgid "{total} package"
+msgid_plural "{total} packages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1193
+#, python-brace-format
+msgid "{n} result"
+msgid_plural "{n} results"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1215 window.py:1388
+msgid "No description available."
+msgstr ""
+
+#: window.py:1228 window.py:1401
+msgid "UPDATE AVAILABLE"
+msgstr ""
+
+#: window.py:1232 window.py:1405 window.py:1873
+msgid "INSTALLED (AUR)"
+msgstr ""
+
+#: window.py:1247 window.py:1250 window.py:1420 window.py:1423
+msgid "Loading…"
+msgstr ""
+
+#: window.py:1307 window.py:1727
+#, python-brace-format
+msgid "{shown} of {total} file"
+msgid_plural "{shown} of {total} files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1311 window.py:1731
+#, python-brace-format
+msgid "{total} file"
+msgid_plural "{total} files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1504
+#, python-brace-format
+msgid "{n} package"
+msgid_plural "{n} packages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: window.py:1508
+#, python-brace-format
+msgid "Look up {dep}"
+msgstr ""
+
+#: window.py:1745
+#, python-brace-format
+msgid "✓ {title} completed"
+msgstr ""
+
+#: window.py:1748
+#, python-brace-format
+msgid "✗ {title} failed (exit {code})"
+msgstr ""
+
+#: window.py:1781
+msgid "System Upgrade"
+msgstr ""
+
+#: window.py:1815
+#, python-brace-format
+msgid "Install {name}"
+msgstr ""
+
+#: window.py:1823
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr ""
+
+#: window.py:1825
+#, python-brace-format
+msgid "This will remove {name} ({version}) from your system."
+msgstr ""
+
+#: window.py:1849
+#, python-brace-format
+msgid "Reinstall {name}"
+msgstr ""

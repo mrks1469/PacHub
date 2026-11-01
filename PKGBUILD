@@ -17,10 +17,12 @@ source=(
   'models.py'
   'styles.py'
   'window.py'
+  'i18n.py'
   'io.github.mrks1469.pachub.svg'
   'LICENSE'
 )
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -38,11 +40,15 @@ package() {
              "$pkgdir/usr/bin" \
              "$pkgdir/usr/share/applications" \
              "$pkgdir/usr/share/icons/hicolor/scalable/apps" \
+             "$pkgdir/usr/share/locale/es/LC_MESSAGES" \
              "$pkgdir/usr/share/licenses/$pkgname"
 
-  for file in app.py backend.py dialogs.py models.py styles.py window.py; do
+  for file in app.py backend.py dialogs.py models.py styles.py window.py i18n.py; do
     install -m 644 "$srcdir/$file" "$appdir/$file"
   done
+
+  install -m 644 "$startdir/locale/es/LC_MESSAGES/pachub.mo" \
+    "$pkgdir/usr/share/locale/es/LC_MESSAGES/pachub.mo"
 
   cat > "$launcher" <<'EOF'
 #!/usr/bin/env bash
@@ -57,6 +63,8 @@ Type=Application
 Name=PacHub
 GenericName=Package Manager
 Comment=A powerful Pacman/AUR front end
+GenericName[es]=Gestor de paquetes
+Comment[es]=Una interfaz potente para Pacman y AUR
 Exec=/usr/bin/pachub
 Icon=io.github.mrks1469.pachub
 Categories=System;PackageManager;
